@@ -68,7 +68,7 @@ flowchart LR
 - **Databricks workspace** with Unity Catalog enabled
 - **Serverless SQL warehouse** (or any SQL warehouse with access to the catalog)
 - **Unity Catalog** catalog provisioned (default: `serverless_stable_swv01_catalog`)
-- Python 3.10+ with `faker`, `pandas`, `numpy` installed (for data generation)
+- Python 3.10+ with `faker`, `pandas`, `numpy` installed (for data generation — generates 12 source tables)
 
 ## Quick Start
 
@@ -115,6 +115,16 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
 | 7 | `genie_call_sentiment` | `transcript_intel_sdp.gold_call_summaries_sentiment` | AI-generated call summaries with sentiment analysis (overall, start, end, trajectory) |
 | 8 | `genie_compliance_daily` | `transcript_intel_sdp.mv_compliance_outcomes` | Daily compliance rates with rolling trends, WoW comparison, agency rankings, and consecutive-day streaks |
 
+### Metric Views (AI/BI)
+
+Pre-defined measures and dimensions for Genie aggregate queries:
+
+| # | Metric View | Source View | Key Measures |
+|---|-------------|-------------|--------------|
+| 9 | `mv_doc_intake_metrics` | `genie_doc_intake_daily` | total_documents, unreadable_rate_pct, channel volumes, spike_day_count |
+| 10 | `mv_doc_match_metrics` | `genie_doc_match_detail` | match_rate_pct, avg_match_weight, high_risk_pct, extraction_completeness_pct |
+| 11 | `mv_call_quality_metrics` | `genie_call_scores` | avg_call_score, compliance_rate_pct, high_risk_pct, escalation_rate_pct |
+
 ## Genie Rooms
 
 ### Room 1: Document Processing & Authorization Intelligence
@@ -152,7 +162,7 @@ DROP SCHEMA serverless_stable_swv01_catalog.genie_availity_ops CASCADE;
 │   └── generate_all.py          # Standalone synthetic data generator
 ├── sql/
 │   ├── 00_create_schemas.sql    # Schema DDL
-│   └── 01_create_genie_views.sql # All 8 Genie view definitions
+│   └── 01_create_genie_views.sql # 8 Genie views + 3 metric views
 └── genie_config/
     └── create_rooms.py          # Genie Room provisioning via API (CLI)
 ```

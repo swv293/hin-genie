@@ -61,7 +61,7 @@ print("\nSchemas ready.")
 # MAGIC %md
 # MAGIC ## Step 2 — Generate Synthetic Data
 # MAGIC
-# MAGIC Generates 9 source tables with realistic distributions: weekday-heavy timestamps, spike days, channel-weighted quality scores, Fellegi-Sunter scoring with proper log-likelihood weights.
+# MAGIC Generates 12 source tables with realistic distributions: weekday-heavy timestamps, spike days, channel-weighted quality scores, Fellegi-Sunter scoring with proper log-likelihood weights, and call center intelligence.
 
 # COMMAND ----------
 
@@ -129,65 +129,167 @@ def fs_weight(match_prob, unmatch_prob):
     return round(math.log2(match_prob / unmatch_prob), 4)
 
 
+LANGUAGES_MEMBER = ["English", "Spanish", "Mandarin", "Vietnamese", "Korean",
+             "Tagalog", "Arabic", "French", "Haitian Creole", "Portuguese"]
+LANG_M_W = [0.72, 0.13, 0.03, 0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0.03]
+RACES = ["White", "Black or African American", "Hispanic or Latino", "Asian",
+         "American Indian or Alaska Native", "Native Hawaiian or Other Pacific Islander",
+         "Two or More Races", "Unknown", "Declined to Answer"]
+RACE_W = [0.40, 0.18, 0.22, 0.08, 0.02, 0.01, 0.04, 0.03, 0.02]
+SOURCES = ["EPIC", "Cerner", "Athena", "AllScripts", "eClinicalWorks", "Manual"]
+SRC_W = [0.35, 0.25, 0.15, 0.10, 0.10, 0.05]
+
 print("Generating members...")
 members = []
 for i in range(ROW_COUNTS["member"]):
-    mid = f"MBR{i+1:06d}"
+    gender = random.choice(["M", "F"])
+    first = fake.first_name_male() if gender == "M" else fake.first_name_female()
+    last = fake.last_name()
+    created = random_ts()
     members.append({
-        "member_id": mid,
-        "first_name": fake.first_name(),
-        "last_name": fake.last_name(),
+        "member_id": str(uuid.uuid4()),
+        "first_name": first,
+        "last_name": last,
+        "middle_initial": random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") if random.random() > 0.15 else None,
         "dob": fake.date_of_birth(minimum_age=1, maximum_age=95).isoformat(),
-        "ssn_last4": f"{random.randint(0,9999):04d}",
-        "gender": random.choice(["M", "F"]),
+        "gender": gender,
+        "ssn4": f"{random.randint(1000,9999)}",
+        "address_line1": fake.street_address(),
+        "city": fake.city(),
         "state": fake.state_abbr(),
-        "payer_code": f"PYR{random.randint(1,12):03d}",
+        "zip": fake.zipcode(),
+        "phone": fake.phone_number(),
+        "email": fake.email(),
+        "preferred_language": random.choices(LANGUAGES_MEMBER, weights=LANG_M_W, k=1)[0],
+        "race_ethnicity": random.choices(RACES, weights=RACE_W, k=1)[0],
+        "created_at": created.isoformat(),
+        "updated_at": (created + timedelta(hours=random.randint(0, 720))).isoformat(),
+        "source_system": random.choices(SOURCES, weights=SRC_W, k=1)[0],
     })
+
+AUTH_STATUSES = ["Approved", "Pending", "Denied", "Partial", "Cancelled", "Expired", "Pended"]
+AUTH_STATUS_W = [0.40, 0.20, 0.12, 0.08, 0.05, 0.10, 0.05]
+DENIAL_REASONS = ["MN01", "CD02", "OON03", "NC04", "EXP05", "DUP06", "NE07", "ICI08"]
+CPT_CODES = ["99213", "99214", "99215", "27447", "27130", "72148", "70553",
+             "43239", "29881", "64483", "62323", "77386", "77385", "20610"]
+ICD10_CODES = ["M17.11", "M17.12", "M16.11", "M54.5", "G89.29", "K21.0",
+               "E11.65", "I10", "J44.1", "F32.1", "M79.3", "R10.9"]
+MATCH_METHODS = ["fellegi_sunter", "exact_id", "manual_review", "rule_based"]
+MATCH_MW = [0.55, 0.25, 0.10, 0.10]
 
 print("Generating authorizations...")
 auths = []
 for i in range(ROW_COUNTS["authorization"]):
-    aid = f"AUTH{i+1:08d}"
     m = random.choice(members)
+    status = random.choices(AUTH_STATUSES, weights=AUTH_STATUS_W, k=1)[0]
+    svc_start = fake.date_between(start_date=START_DATE, end_date=END_DATE)
+    created = random_ts()
     auths.append({
-        "auth_id": aid,
+        "auth_id": str(uuid.uuid4()),
+        "auth_number": f"AUTH-{created.year}-{random.randint(100000, 999999):06d}",
         "member_id": m["member_id"],
-        "auth_type": random.choice(["inpatient", "outpatient", "imaging", "medication", "dme"]),
-        "status": random.choice(["approved", "pending", "denied", "expired"]),
-        "service_start": (START_DATE + timedelta(days=random.randint(0, 60))).date().isoformat(),
-        "service_end": (START_DATE + timedelta(days=random.randint(61, 120))).date().isoformat(),
-        "payer_code": m["payer_code"],
-        "provider_npi": f"{random.randint(1000000000, 9999999999)}",
-        "created_ts": random_ts().isoformat(),
+        "service_from_date": svc_start.isoformat(),
+        "service_to_date": (svc_start + timedelta(days=random.randint(1, 90))).isoformat(),
+        "procedure_code": random.choice(CPT_CODES),
+        "procedure_modifier": random.choice([None, None, "26", "TC", "59", "LT", "RT"]),
+        "diagnosis_code": random.choice(ICD10_CODES),
+        "rendering_provider_npi": f"{random.randint(1000000000, 1999999999)}",
+        "rendering_provider_name": f"Dr. {fake.last_name()}",
+        "status": status,
+        "approved_units": random.randint(1, 30) if status == "Approved" else (random.randint(1, 10) if status == "Partial" else None),
+        "denial_reason_code": random.choice(DENIAL_REASONS) if status in ("Denied", "Partial", "Pended") else None,
+        "auth_requested_date": created.date().isoformat(),
+        "auth_decision_date": (created + timedelta(days=random.randint(1, 14))).date().isoformat() if status != "Pending" else None,
+        "clinical_doc_id": None,
+        "doc_match_method": random.choices(MATCH_METHODS, weights=MATCH_MW, k=1)[0],
+        "doc_received_date": created.isoformat() if random.random() > 0.3 else None,
+        "pend_reason": random.choice([None, "Awaiting clinical notes", "Provider callback needed"]) if status == "Pended" else None,
+        "additional_info_due_date": (created + timedelta(days=random.randint(5, 30))).date().isoformat() if status == "Pended" else None,
+        "created_at": created.isoformat(),
+        "updated_at": (created + timedelta(hours=random.randint(0, 168))).isoformat(),
+        "created_by": random.choice(["system_auto", "intake_agent", "um_reviewer", "admin"]),
     })
+
+DOC_TYPE_WEIGHTS = [0.35, 0.25, 0.20, 0.12, 0.08]
+OCR_STATUSES = ["completed", "completed_with_warnings", "failed", "pending"]
+OCR_SW = [0.82, 0.10, 0.05, 0.03]
+MATCH_STATUSES_DOC = ["matched", "possible_match", "unmatched", "pending_review"]
+MS_W = [0.55, 0.20, 0.15, 0.10]
+FILE_FORMATS = ["PDF", "TIFF", "TIFF", "PNG", "JPEG"]
+
+auth_ids = [a["auth_id"] for a in auths]
+member_ids = [m["member_id"] for m in members]
 
 print("Generating clinical documents...")
 docs = []
 for i in range(ROW_COUNTS["clinical_document"]):
-    did = str(uuid.uuid4())
+    doc_type = random.choices(DOC_TYPES, weights=DOC_TYPE_WEIGHTS, k=1)[0]
     channel = random.choices(CHANNELS, weights=CHANNEL_WEIGHTS, k=1)[0]
-    base_q = {"fax": 0.65, "electronic": 0.92, "upload": 0.88, "mail": 0.60}[channel]
-    quality = round(min(1.0, max(0.0, np.random.normal(base_q, 0.12))), 3)
+    ocr_status = random.choices(OCR_STATUSES, weights=OCR_SW, k=1)[0]
+    fmt = random.choice(FILE_FORMATS)
+    ext = {"PDF": ".pdf", "TIFF": ".tiff", "PNG": ".png", "JPEG": ".jpg"}[fmt]
+    did = str(uuid.uuid4())
+    ingestion_ts = random_ts()
+
+    base_q = {"fax": 0.72, "electronic": 0.92, "upload": 0.85, "mail": 0.65}[channel]
+    quality = round(min(1.0, max(0.1, np.random.normal(base_q, 0.12))), 3)
+    ocr_conf = round(min(1.0, max(0.0, quality + np.random.normal(0, 0.05))), 3)
+    is_readable = random.random() > 0.08
+    if ocr_status == "failed":
+        is_readable = False
+        quality = round(min(0.5, max(0.05, np.random.normal(0.25, 0.1))), 3)
+        ocr_conf = round(min(0.4, max(0.0, np.random.normal(0.15, 0.1))), 3)
+
+    match_status = random.choices(MATCH_STATUSES_DOC, weights=MS_W, k=1)[0]
+    match_conf = round(random.uniform(0.6, 0.99), 3) if match_status == "matched" else (
+        round(random.uniform(0.3, 0.6), 3) if match_status == "possible_match" else None)
+    matched_at = (ingestion_ts + timedelta(minutes=random.randint(5, 120))).isoformat() if match_status == "matched" else None
+
     docs.append({
         "doc_id": did,
-        "document_type": random.choice(DOC_TYPES),
-        "source_channel": channel,
-        "quality_score": quality,
-        "is_readable": quality > 0.3,
+        "auth_id": random.choice(auth_ids) if random.random() > 0.15 else None,
+        "member_id": random.choice(member_ids) if random.random() > 0.10 else None,
+        "document_type": doc_type,
+        "file_name": f"{doc_type}_{did[:8]}{ext}",
+        "file_path": f"/mnt/clinical_docs/{doc_type}/{did}{ext}",
+        "file_format": fmt,
+        "file_size_bytes": random.randint(50, 15000) * 1024,
         "page_count": random.randint(1, 25),
-        "ingestion_timestamp": random_ts().isoformat(),
-        "payer_code": f"PYR{random.randint(1,12):03d}",
+        "source_channel": channel,
+        "sender_fax_number": fake.phone_number() if channel == "fax" else None,
+        "sender_provider_npi": f"{random.randint(1000000000, 1999999999)}" if random.random() > 0.2 else None,
+        "received_timestamp": (ingestion_ts - timedelta(minutes=random.randint(1, 30))).isoformat(),
+        "ingestion_timestamp": ingestion_ts.isoformat(),
+        "mrm_batch_id": f"MRM-{ingestion_ts.strftime('%Y%m%d')}-{random.randint(1,50):03d}",
+        "cover_sheet_detected": random.random() > 0.6 if channel == "fax" else False,
+        "ocr_status": ocr_status,
+        "ocr_confidence_score": ocr_conf,
+        "match_status": match_status,
+        "doc_match_method": random.choice(["fellegi_sunter", "exact_id", "rule_based"]) if match_status in ("matched", "possible_match") else None,
+        "match_confidence_score": match_conf,
+        "matched_by": random.choice(["system_auto", "um_reviewer"]) if match_status == "matched" else None,
+        "matched_at": matched_at,
+        "is_readable": is_readable,
+        "quality_score": quality,
+        "notes": None,
+        "created_at": ingestion_ts.isoformat(),
+        "updated_at": (ingestion_ts + timedelta(minutes=random.randint(1, 120))).isoformat(),
     })
 
 print("Generating parsed documents...")
 parsed = []
 for d in docs:
     unreadable = not d["is_readable"]
+    parse_error = None
+    if not unreadable and random.random() < 0.05:
+        parse_error = random.choice(["timeout", "corrupt_header", "unsupported_format", "ocr_engine_failure"])
+    elif unreadable:
+        parse_error = "unreadable"
     parsed.append({
         "doc_id": d["doc_id"],
         "unreadable_flag": unreadable,
         "page_count_detected": d["page_count"] if not unreadable else 0,
-        "parse_error_status": random.choice([None, None, None, "timeout", "corrupt_header"]) if not unreadable else "unreadable",
+        "parse_error_status": parse_error,
         "ingest_ts": d["ingestion_timestamp"],
     })
 
@@ -197,25 +299,35 @@ for d in docs:
     if not d["is_readable"]:
         continue
     m = random.choice(members)
-    a = random.choice(auths)
+    missing_dob = random.random() < 0.15
+    missing_ssn4 = random.random() < 0.20
     structured.append({
         "doc_id": d["doc_id"],
-        "member_id_on_form": m["member_id"] if random.random() > 0.15 else None,
-        "auth_id": a["auth_id"] if random.random() > 0.20 else None,
-        "dob_extracted": m["dob"] if random.random() > 0.10 else None,
-        "ssn4_extracted": m["ssn_last4"] if random.random() > 0.25 else None,
-        "missing_dob": random.random() < 0.10,
-        "missing_ssn4": random.random() < 0.25,
+        "member_id_on_form": d.get("member_id") if random.random() > 0.30 else None,
+        "auth_id": d.get("auth_id") if random.random() > 0.25 else None,
+        "dob_extracted": m["dob"] if not missing_dob else None,
+        "ssn4_extracted": m["ssn4"] if not missing_ssn4 else None,
+        "missing_dob": missing_dob,
+        "missing_ssn4": missing_ssn4,
         "extraction_ts": d["ingestion_timestamp"],
     })
+
+FS_M = {"ssn4": 0.95, "dob": 0.92, "name": 0.89}
+FS_U = {"ssn4": 0.001, "dob": 0.005, "name": 0.015}
+
+def fs_agree_weight(agree, m_prob, u_prob):
+    if agree:
+        return math.log2(m_prob / u_prob) if u_prob > 0 else 8.0
+    else:
+        return math.log2((1 - m_prob) / (1 - u_prob)) if (1 - u_prob) > 0 else -4.0
 
 print("Generating member match candidates...")
 member_matches = []
 for s in structured:
     m = random.choice(members)
-    name_w = fs_weight(random.uniform(0.7, 0.99), random.uniform(0.01, 0.3))
-    dob_w = fs_weight(random.uniform(0.6, 0.99), random.uniform(0.01, 0.2)) if not s["missing_dob"] else 0.0
-    ssn_w = fs_weight(random.uniform(0.8, 0.99), random.uniform(0.01, 0.1)) if not s["missing_ssn4"] else 0.0
+    name_w = round(fs_agree_weight(random.random() > 0.3, FS_M["name"], FS_U["name"]), 4)
+    dob_w = round(fs_agree_weight(random.random() > 0.2, FS_M["dob"], FS_U["dob"]), 4) if not s["missing_dob"] else 0.0
+    ssn_w = round(fs_agree_weight(random.random() > 0.15, FS_M["ssn4"], FS_U["ssn4"]), 4) if not s["missing_ssn4"] else 0.0
     total = round(name_w + dob_w + ssn_w, 4)
     if total > 8:
         mc = "match"
@@ -237,12 +349,12 @@ for s in structured:
 print("Generating auth match candidates...")
 auth_matches = []
 for s in structured:
-    if s["auth_id"] is None:
+    if s["auth_id"] is None and random.random() > 0.3:
         continue
     a = random.choice(auths)
-    auth_id_w = fs_weight(random.uniform(0.8, 0.99), random.uniform(0.01, 0.15))
-    date_w = fs_weight(random.uniform(0.5, 0.95), random.uniform(0.05, 0.3))
-    total = round(auth_id_w + date_w, 4)
+    aid_w = round(fs_agree_weight(random.random() > 0.25, 0.92, 0.01), 4)
+    date_w = round(fs_agree_weight(random.random() > 0.35, 0.80, 0.05), 4)
+    total = round(aid_w + date_w, 4)
     if total > 6:
         mc = "match"
     elif total > 2:
@@ -252,7 +364,7 @@ for s in structured:
     auth_matches.append({
         "doc_id": s["doc_id"],
         "candidate_auth_id": a["auth_id"],
-        "auth_id_weight": auth_id_w,
+        "auth_id_weight": aid_w,
         "service_date_weight": date_w,
         "total_weight": total,
         "match_class": mc,
@@ -305,6 +417,7 @@ for i in range(3000):
     ts = random_ts()
     calls_scores.append({
         "call_id": cid,
+        "document_id": cid,
         "agent_name": agent,
         "agency_name": agency,
         "call_type": ct,
@@ -315,11 +428,13 @@ for i in range(3000):
         "summary_of_score": f"Score {score}: {disp} call with {'adequate' if score >= 70 else 'insufficient'} documentation.",
         "outcome_bucket": bucket,
         "created_ts": ts.isoformat(),
+        "source_schema": "sdp",
     })
     n_topics = random.randint(1, 4)
     calls_sentiment.append({
         "document_id": cid,
         "call_type": ct,
+        "vendor_template": f"TPL_{ct[:3].upper()}_{random.randint(1,5):02d}",
         "summary_text": f"Caller inquired about {random.choice(TOPIC_POOL)}. Agent {'resolved the issue' if disp == 'resolved' else 'provided guidance and next steps'}.",
         "sentiment_overall": random.choice(SENTIMENTS_OVERALL),
         "sentiment_start": random.choice(SENTIMENTS_START),
@@ -327,6 +442,8 @@ for i in range(3000):
         "sentiment_trajectory": random.choice(TRAJECTORIES),
         "key_topics": random.sample(TOPIC_POOL, n_topics),
         "emotional_markers": random.sample(EMOTIONAL_MARKERS, random.randint(0, 3)),
+        "created_ts": ts.isoformat(),
+        "source_schema": "sdp",
     })
     day_key = (ts.date().isoformat(), ct, agency)
     if day_key not in compliance_data:
@@ -347,14 +464,16 @@ for (day, ct, agency), v in compliance_data.items():
         "compliant_calls": v["compliant"],
         "needs_review_calls": v["needs_review"],
         "high_risk_calls": v["high_risk"],
-        "high_risk_rate": round(v["high_risk"] / sc, 4) if sc else 0,
-        "compliance_rate": round(v["compliant"] / sc, 4) if sc else 0,
+        "high_risk_rate": round(v["high_risk"] / sc, 5) if sc else 0,
+        "compliance_rate": round(v["compliant"] / sc, 16) if sc else 0,
+        "source_schema": "sdp",
     })
 
 print(f"\nGenerated: {len(members)} members, {len(auths)} authorizations, {len(docs)} documents")
 print(f"  {len(parsed)} parsed, {len(structured)} structured, {len(member_matches)} member matches")
 print(f"  {len(auth_matches)} auth matches, {len(match_events)} match events")
 print(f"  {len(calls_scores)} call scores, {len(calls_sentiment)} sentiments, {len(compliance_rows)} compliance rows")
+print(f"\n12 tables ready for writing.")
 
 # COMMAND ----------
 
@@ -821,6 +940,195 @@ FROM streaks
 print(f"  ✓ genie_compliance_daily")
 
 print("\nAll 8 Genie views created.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Step 5b — Create Metric Views (AI/BI)
+# MAGIC
+# MAGIC Metric views expose pre-defined measures and dimensions so Genie can answer aggregate questions without writing SQL.
+
+# COMMAND ----------
+
+spark.sql(f"""
+CREATE OR REPLACE VIEW {CATALOG}.genie_availity_ops.mv_doc_intake_metrics
+  WITH METRICS
+  LANGUAGE YAML
+AS $
+source: {CATALOG}.genie_availity_ops.genie_doc_intake_daily
+
+dimensions:
+  - name: intake_date
+    expr: intake_date
+    type: DATE
+    description: "Calendar date documents were received"
+  - name: is_volume_spike
+    expr: is_volume_spike
+    type: BOOLEAN
+    description: "True if total_docs exceeds 2x the 7-day rolling average"
+
+measures:
+  - name: total_documents
+    expr: SUM(total_docs)
+    type: INT
+    description: "Total documents received"
+  - name: unreadable_documents
+    expr: SUM(unreadable_docs)
+    type: INT
+    description: "Documents flagged unreadable by OCR"
+  - name: avg_ocr_quality
+    expr: ROUND(AVG(avg_quality_score), 3)
+    type: DOUBLE
+    description: "Average OCR quality score (0.0 to 1.0)"
+  - name: fax_volume
+    expr: SUM(via_fax)
+    type: INT
+    description: "Documents received via fax"
+  - name: electronic_volume
+    expr: SUM(via_electronic)
+    type: INT
+    description: "Documents received via electronic/EDI"
+  - name: upload_volume
+    expr: SUM(via_upload)
+    type: INT
+    description: "Documents received via portal upload"
+  - name: mail_volume
+    expr: SUM(via_mail)
+    type: INT
+    description: "Documents received via physical mail/scan"
+  - name: spike_day_count
+    expr: SUM(CASE WHEN is_volume_spike THEN 1 ELSE 0 END)
+    type: INT
+    description: "Number of days flagged as volume spikes"
+  - name: unreadable_rate_pct
+    expr: ROUND(100.0 * SUM(unreadable_docs) / NULLIF(SUM(total_docs), 0), 2)
+    type: DOUBLE
+    description: "Percentage of documents that are unreadable"
+$
+""")
+print(f"  mv_doc_intake_metrics")
+
+# COMMAND ----------
+
+spark.sql(f"""
+CREATE OR REPLACE VIEW {CATALOG}.genie_availity_ops.mv_doc_match_metrics
+  WITH METRICS
+  LANGUAGE YAML
+AS $
+source: {CATALOG}.genie_availity_ops.genie_doc_match_detail
+
+dimensions:
+  - name: document_type
+    expr: document_type
+    type: STRING
+    description: "Document type: prior_auth_form, clinical_note, lab_result, imaging_report, discharge_summary"
+  - name: source_channel
+    expr: source_channel
+    type: STRING
+    description: "Intake channel: fax, electronic, upload, mail"
+  - name: match_class
+    expr: match_class
+    type: STRING
+    description: "Fellegi-Sunter classification: match, possible_match, non_match"
+  - name: doc_risk_tier
+    expr: doc_risk_tier
+    type: STRING
+    description: "Risk tier based on extraction completeness"
+  - name: intake_date
+    expr: intake_date
+    type: DATE
+    description: "Date document was received"
+
+measures:
+  - name: document_count
+    expr: COUNT(*)
+    type: INT
+    description: "Total documents"
+  - name: match_rate_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of documents that matched"
+  - name: avg_match_weight
+    expr: ROUND(AVG(match_weight), 4)
+    type: DOUBLE
+    description: "Average Fellegi-Sunter match weight"
+  - name: high_risk_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN doc_risk_tier LIKE 'High%' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of documents in High Risk tier"
+  - name: extraction_completeness_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN NOT missing_dob AND NOT missing_ssn4 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage with both DOB and SSN4 extracted"
+  - name: non_match_count
+    expr: SUM(CASE WHEN match_class = 'non_match' THEN 1 ELSE 0 END)
+    type: INT
+    description: "Documents that did not match any member"
+$
+""")
+print(f"  mv_doc_match_metrics")
+
+# COMMAND ----------
+
+spark.sql(f"""
+CREATE OR REPLACE VIEW {CATALOG}.genie_availity_ops.mv_call_quality_metrics
+  WITH METRICS
+  LANGUAGE YAML
+AS $
+source: {CATALOG}.genie_availity_ops.genie_call_scores
+
+dimensions:
+  - name: agency_name
+    expr: agency_name
+    type: STRING
+    description: "Partner call center agency"
+  - name: call_type
+    expr: call_type
+    type: STRING
+    description: "Call type taxonomy"
+  - name: disposition
+    expr: disposition
+    type: STRING
+    description: "Call outcome: resolved, pending, escalated, complaint, appeal_opened"
+  - name: outcome_bucket
+    expr: outcome_bucket
+    type: STRING
+    description: "Triage bucket: compliant, needs_review, high_risk"
+  - name: scored_date
+    expr: scored_date
+    type: DATE
+    description: "Date the call was scored"
+
+measures:
+  - name: total_calls
+    expr: COUNT(*)
+    type: INT
+    description: "Total calls scored"
+  - name: avg_call_score
+    expr: ROUND(AVG(call_score), 1)
+    type: DOUBLE
+    description: "Average quality score (0-100)"
+  - name: compliance_rate_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN outcome_bucket = 'compliant' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of calls that are compliant (score >= 85)"
+  - name: high_risk_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN outcome_bucket = 'high_risk' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of calls that are high risk (score < 70)"
+  - name: escalation_count
+    expr: SUM(CASE WHEN disposition = 'escalated' THEN 1 ELSE 0 END)
+    type: INT
+    description: "Number of escalated calls"
+  - name: escalation_rate_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN disposition = 'escalated' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of calls that were escalated"
+$
+""")
+print(f"  mv_call_quality_metrics")
+
+print("\nAll 3 metric views created.")
 
 # COMMAND ----------
 

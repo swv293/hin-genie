@@ -413,3 +413,191 @@ SELECT
     ELSE 0
   END AS days_below_threshold
 FROM streaks;
+
+
+-- ============================================================
+-- METRIC VIEWS (Databricks AI/BI)
+-- ============================================================
+-- Metric views expose pre-defined measures and dimensions so
+-- Genie can answer aggregate questions without writing SQL.
+-- Syntax: CREATE VIEW ... WITH METRICS LANGUAGE YAML AS$ ... $
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 9. mv_doc_intake_metrics
+--    Measures over genie_doc_intake_daily for document volume
+--    and channel analysis.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW genie_availity_ops.mv_doc_intake_metrics
+  WITH METRICS
+  LANGUAGE YAML
+AS $
+source: serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily
+
+dimensions:
+  - name: intake_date
+    expr: intake_date
+    type: DATE
+    description: "Calendar date documents were received"
+  - name: is_volume_spike
+    expr: is_volume_spike
+    type: BOOLEAN
+    description: "True if total_docs exceeds 2x the 7-day rolling average"
+
+measures:
+  - name: total_documents
+    expr: SUM(total_docs)
+    type: INT
+    description: "Total documents received"
+  - name: unreadable_documents
+    expr: SUM(unreadable_docs)
+    type: INT
+    description: "Documents flagged unreadable by OCR"
+  - name: avg_ocr_quality
+    expr: ROUND(AVG(avg_quality_score), 3)
+    type: DOUBLE
+    description: "Average OCR quality score (0.0 to 1.0)"
+  - name: fax_volume
+    expr: SUM(via_fax)
+    type: INT
+    description: "Documents received via fax"
+  - name: electronic_volume
+    expr: SUM(via_electronic)
+    type: INT
+    description: "Documents received via electronic/EDI"
+  - name: upload_volume
+    expr: SUM(via_upload)
+    type: INT
+    description: "Documents received via portal upload"
+  - name: mail_volume
+    expr: SUM(via_mail)
+    type: INT
+    description: "Documents received via physical mail/scan"
+  - name: spike_day_count
+    expr: SUM(CASE WHEN is_volume_spike THEN 1 ELSE 0 END)
+    type: INT
+    description: "Number of days flagged as volume spikes"
+  - name: unreadable_rate_pct
+    expr: ROUND(100.0 * SUM(unreadable_docs) / NULLIF(SUM(total_docs), 0), 2)
+    type: DOUBLE
+    description: "Percentage of documents that are unreadable"
+$;
+
+-- ------------------------------------------------------------
+-- 10. mv_doc_match_metrics
+--     Measures over genie_doc_match_detail for match quality
+--     and risk analysis.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW genie_availity_ops.mv_doc_match_metrics
+  WITH METRICS
+  LANGUAGE YAML
+AS $
+source: serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail
+
+dimensions:
+  - name: document_type
+    expr: document_type
+    type: STRING
+    description: "Document type: prior_auth_form, clinical_note, lab_result, imaging_report, discharge_summary"
+  - name: source_channel
+    expr: source_channel
+    type: STRING
+    description: "Intake channel: fax, electronic, upload, mail"
+  - name: match_class
+    expr: match_class
+    type: STRING
+    description: "Fellegi-Sunter classification: match, possible_match, non_match"
+  - name: doc_risk_tier
+    expr: doc_risk_tier
+    type: STRING
+    description: "Risk tier based on extraction completeness"
+  - name: intake_date
+    expr: intake_date
+    type: DATE
+    description: "Date document was received"
+
+measures:
+  - name: document_count
+    expr: COUNT(*)
+    type: INT
+    description: "Total documents"
+  - name: match_rate_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of documents that matched"
+  - name: avg_match_weight
+    expr: ROUND(AVG(match_weight), 4)
+    type: DOUBLE
+    description: "Average Fellegi-Sunter match weight"
+  - name: high_risk_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN doc_risk_tier LIKE 'High%' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of documents in High Risk tier"
+  - name: extraction_completeness_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN NOT missing_dob AND NOT missing_ssn4 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage with both DOB and SSN4 extracted"
+  - name: non_match_count
+    expr: SUM(CASE WHEN match_class = 'non_match' THEN 1 ELSE 0 END)
+    type: INT
+    description: "Documents that did not match any member"
+$;
+
+-- ------------------------------------------------------------
+-- 11. mv_call_quality_metrics
+--     Measures over genie_call_scores for call center performance.
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW genie_availity_ops.mv_call_quality_metrics
+  WITH METRICS
+  LANGUAGE YAML
+AS $
+source: serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores
+
+dimensions:
+  - name: agency_name
+    expr: agency_name
+    type: STRING
+    description: "Partner call center agency"
+  - name: call_type
+    expr: call_type
+    type: STRING
+    description: "Call type taxonomy"
+  - name: disposition
+    expr: disposition
+    type: STRING
+    description: "Call outcome: resolved, pending, escalated, complaint, appeal_opened"
+  - name: outcome_bucket
+    expr: outcome_bucket
+    type: STRING
+    description: "Triage bucket: compliant, needs_review, high_risk"
+  - name: scored_date
+    expr: scored_date
+    type: DATE
+    description: "Date the call was scored"
+
+measures:
+  - name: total_calls
+    expr: COUNT(*)
+    type: INT
+    description: "Total calls scored"
+  - name: avg_call_score
+    expr: ROUND(AVG(call_score), 1)
+    type: DOUBLE
+    description: "Average quality score (0-100)"
+  - name: compliance_rate_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN outcome_bucket = 'compliant' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of calls that are compliant (score >= 85)"
+  - name: high_risk_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN outcome_bucket = 'high_risk' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of calls that are high risk (score < 70)"
+  - name: escalation_count
+    expr: SUM(CASE WHEN disposition = 'escalated' THEN 1 ELSE 0 END)
+    type: INT
+    description: "Number of escalated calls"
+  - name: escalation_rate_pct
+    expr: ROUND(100.0 * SUM(CASE WHEN disposition = 'escalated' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2)
+    type: DOUBLE
+    description: "Percentage of calls that were escalated"
+$;
