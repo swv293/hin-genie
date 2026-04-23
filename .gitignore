@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output
+output/
+*.parquet
+
+# Secrets / credentials
+.env
+*.token
+credentials.json
+
+# Generated room IDs (contains workspace-specific info)
+genie_config/room_ids.json
