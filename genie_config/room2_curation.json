@@ -1,0 +1,592 @@
+{
+  "space_id": "01f13f1703ce199ebd91803207433969",
+  "title": "Provider Support & Call Intelligence",
+  "description": "Call center analytics for a national health information network / clearinghouse that handles millions of provider support calls per year. When providers need help with prior authorizations, claims status, eligibility verification, benefit inquiries, or enrollment, they call into outsourced partner agencies.\n\nEvery call is transcribed via ASR, scored against a quality rubric (35% transcription confidence + 35% section coverage + 20% PII redaction compliance + 10% disposition quality), and analyzed for sentiment using AI-generated summaries. Supervisors use this data to coach agents, track compliance, and identify systemic issues before they become provider complaints or SLA breaches.\n\nThis room covers call quality scoring with agent rankings and rolling trends, AI-generated sentiment analysis (overall tone, opening/closing sentiment, trajectory arc), and compliance tracking with week-over-week comparison and consecutive-day streak detection. Built for call center supervisors, QA analysts, and provider relations teams.",
+  "warehouse_id": "084543d48aafaeb2",
+  "serialized_space": {
+    "version": 2,
+    "config": {
+      "sample_questions": [
+        {
+          "id": "3779189fbf264a9c9b10f2b041bc093f",
+          "question": [
+            "Top-ranked agents by agency"
+          ]
+        },
+        {
+          "id": "4ab428b0ff29459ea830a4a3cfe73a42",
+          "question": [
+            "Call types with most negative sentiment"
+          ]
+        },
+        {
+          "id": "5db7bc15c73f4c0e91aa9f7ed76c66fb",
+          "question": [
+            "Which agents need coaching?"
+          ]
+        },
+        {
+          "id": "760a0af82d07448384913632097cf49a",
+          "question": [
+            "Sentiment distribution across all calls"
+          ]
+        },
+        {
+          "id": "870ee68d51f741a2a40c33a852d74347",
+          "question": [
+            "Agents trending downward on rolling average"
+          ]
+        },
+        {
+          "id": "98b0c7096e6345739d09812a8f2948a3",
+          "question": [
+            "Top emotional markers in high-risk calls"
+          ]
+        },
+        {
+          "id": "9dd0213cc1f84745a42e882fe33be822",
+          "question": [
+            "Which agencies are below compliance threshold?"
+          ]
+        },
+        {
+          "id": "ae33d947a717499ca0f13c961b22f6d8",
+          "question": [
+            "Declining sentiment calls with complaints"
+          ]
+        },
+        {
+          "id": "c2cdcd6823c3453e93ff5d9fc3fef08c",
+          "question": [
+            "Average call quality score by agency"
+          ]
+        },
+        {
+          "id": "eafa06bac63848d6ac3179d4e48fca51",
+          "question": [
+            "Compliance trend last 30 days"
+          ]
+        }
+      ]
+    },
+    "data_sources": {
+      "tables": [
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_call_quality_metrics"
+        }
+      ]
+    },
+    "instructions": {
+      "text_instructions": [
+        {
+          "id": "9031b346df61418cb39945349ab74991",
+          "content": [
+            "## Who uses this room\n",
+            "Call center supervisors, QA analysts, and provider relations managers at a national health information network. When document processing fails or transactions stall, providers call. Understanding why, how well agents handle it, and where self-service could deflect volume is a direct lever on network value.\n",
+            "\n",
+            "## Jargon\n",
+            "- call_score: 0-100. 35% ASR confidence + 35% section coverage + 20% redaction + 10% disposition.\n",
+            "- outcome_bucket: 'compliant' (>=85), 'needs_review' (70-84), 'high_risk' (<70).\n",
+            "- ASR: Automatic Speech Recognition. FCR: First Call Resolution. CSAT: Customer Satisfaction.\n",
+            "- Compliance rate: fraction of calls >= 85. Target: 0.85 (85%).\n",
+            "- days_below_threshold: consecutive calendar days compliance_rate < 0.85. Streak > 3 = systemic issue.\n",
+            "- Sentiment trajectory: stable, improving, declining, volatile. 'declining' = started fine, ended badly.\n",
+            "- Emotional markers: frustration, clarification_question, supervisor_request, code_switching (language switch), hold_used.\n",
+            "\n",
+            "## Guardrails\n",
+            "- No caller PII. Agent names are pseudonymized.\n",
+            "- 'worst agents' \u2192 frame as 'agents who would benefit from coaching'. Use agent_rank_in_agency.\n",
+            "- Always pair sentiment_overall with sentiment_trajectory for full context.\n",
+            "- genie_call_sentiment.document_id = genie_call_scores.call_id for joining.\n",
+            "- Default date range: last 30 days.\n",
+            "- Window columns (agent_avg_score, agent_rolling_5_avg, rolling_7d_compliance) are pre-computed.\n",
+            "\n",
+            "## Beyond this room\n",
+            "Document processing pipeline and match quality: 'Clinical Document Processing Intelligence' room.\n"
+          ]
+        }
+      ],
+      "example_question_sqls": [
+        {
+          "id": "3334494043d6433ab12b408c094795cf",
+          "question": [
+            "High risk calls with declining sentiment"
+          ],
+          "sql": [
+            "SELECT c.call_id, c.agent_name, c.call_score, c.disposition, s.sentiment_overall, s.sentiment_trajectory, s.summary_text FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores c JOIN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment s ON c.call_id = s.document_id WHERE c.outcome_bucket = 'high_risk' AND s.sentiment_trajectory = 'declining' ORDER BY c.call_score"
+          ],
+          "usage_guidance": [
+            "Use for identifying worst-case calls combining low scores with declining sentiment"
+          ]
+        },
+        {
+          "id": "36b80b41ff084f07937254c0b558c7fa",
+          "question": [
+            "Agencies with compliance streaks above 3 days"
+          ],
+          "sql": [
+            "SELECT agency_name, call_type, day, compliance_rate, days_below_threshold FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily WHERE days_below_threshold > 3 ORDER BY days_below_threshold DESC, day DESC"
+          ],
+          "usage_guidance": [
+            "Use for compliance streak alerts or systemic agency issues"
+          ]
+        },
+        {
+          "id": "c0c43c047f234dcdb48a69b4e8a6829b",
+          "question": [
+            "Bottom 10 agents by average score with call counts"
+          ],
+          "sql": [
+            "SELECT agent_name, agency_name, ROUND(AVG(call_score), 1) AS avg_score, COUNT(*) AS calls FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores GROUP BY agent_name, agency_name ORDER BY avg_score LIMIT 10"
+          ],
+          "usage_guidance": [
+            "Use for worst performing agents, coaching candidates, or bottom agent rankings"
+          ]
+        },
+        {
+          "id": "ca68dae18cad46b29f5beb16e6a294c8",
+          "question": [
+            "Sentiment distribution for escalated calls"
+          ],
+          "sql": [
+            "SELECT s.sentiment_overall, s.sentiment_trajectory, COUNT(*) AS call_count FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment s JOIN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores c ON s.document_id = c.call_id WHERE c.disposition = 'escalated' GROUP BY s.sentiment_overall, s.sentiment_trajectory ORDER BY call_count DESC"
+          ],
+          "usage_guidance": [
+            "Use for sentiment analysis on escalated or problematic calls"
+          ]
+        },
+        {
+          "id": "fed05c72b14a4969beb9ae97120d49ea",
+          "question": [
+            "Agency compliance ranking with rolling trend"
+          ],
+          "sql": [
+            "SELECT agency_name, day, compliance_rate, rolling_7d_compliance, agency_compliance_rank FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily WHERE day >= CURRENT_DATE - INTERVAL 7 DAYS ORDER BY day DESC, agency_compliance_rank"
+          ],
+          "usage_guidance": [
+            "Use for agency comparison, compliance leaderboard, or ranking questions"
+          ]
+        }
+      ],
+      "join_specs": [
+        {
+          "id": "a85184d08f264e9c845e8fadcdfebff3",
+          "left": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores",
+            "alias": "genie_call_scores"
+          },
+          "right": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily",
+            "alias": "genie_compliance_daily"
+          },
+          "sql": [
+            "`genie_call_scores`.`scored_date` = `genie_compliance_daily`.`day` AND `genie_call_scores`.`agency_name` = `genie_compliance_daily`.`agency_name` AND `genie_call_scores`.`call_type` = `genie_compliance_daily`.`call_type`",
+            "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+          ],
+          "comment": [
+            "Many scored calls per daily compliance aggregate"
+          ],
+          "instruction": [
+            "Use when correlating individual call scores with daily compliance metrics for the same agency, call type, and day"
+          ]
+        },
+        {
+          "id": "df7315211af546a384986829445ac46d",
+          "left": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment",
+            "alias": "genie_call_sentiment"
+          },
+          "right": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores",
+            "alias": "genie_call_scores"
+          },
+          "sql": [
+            "`genie_call_sentiment`.`document_id` = `genie_call_scores`.`call_id`",
+            "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--"
+          ],
+          "comment": [
+            "One sentiment analysis per scored call"
+          ],
+          "instruction": [
+            "Use when combining call quality scores with AI-generated sentiment analysis"
+          ]
+        }
+      ],
+      "sql_snippets": {
+        "filters": [
+          {
+            "id": "271f5d9fe5484921ba2cf02e30d2b1f3",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily.`days_below_threshold` > 3"
+            ],
+            "display_name": "Systemic Compliance Issues",
+            "instruction": [
+              "Use when user asks about persistent compliance problems or systemic issues (> 3 consecutive days below threshold)."
+            ],
+            "synonyms": [
+              "systemic",
+              "persistent",
+              "chronic",
+              "ongoing compliance issue"
+            ]
+          },
+          {
+            "id": "68dc2ac3263943a9b507ad3e2ea5b75b",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`outcome_bucket` = 'high_risk'"
+            ],
+            "display_name": "High Risk Calls Only",
+            "instruction": [
+              "Use when user asks about high risk, problematic, or failing calls."
+            ],
+            "synonyms": [
+              "high risk",
+              "failing",
+              "below 70"
+            ]
+          },
+          {
+            "id": "a3aeca3ade744cab9e1c3c6880a98abc",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`disposition` = 'escalated'"
+            ],
+            "display_name": "Escalated Calls Only",
+            "instruction": [
+              "Use when user asks about escalations or supervisor transfers."
+            ],
+            "synonyms": [
+              "escalated",
+              "escalation",
+              "supervisor",
+              "transferred"
+            ]
+          },
+          {
+            "id": "d40444f0f8764d11ae9957f29cfc8413",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment.`sentiment_trajectory` = 'declining'"
+            ],
+            "display_name": "Declining Sentiment Calls",
+            "instruction": [
+              "Use when user asks about calls that went badly or declining sentiment."
+            ],
+            "synonyms": [
+              "declining",
+              "deteriorating",
+              "went badly",
+              "got worse"
+            ]
+          }
+        ],
+        "expressions": [
+          {
+            "id": "1270d3dfad2540b7a07866690cdc1f61",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`scored_date`"
+            ],
+            "display_name": "Scored Date",
+            "instruction": [
+              "Use as time dimension for daily trending of call scores."
+            ],
+            "synonyms": [
+              "date",
+              "day",
+              "scored date",
+              "call date"
+            ]
+          },
+          {
+            "id": "2b3580f8917e4c33bc7e05a5e4d2a0d7",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`agent_name`"
+            ],
+            "display_name": "Agent Name",
+            "instruction": [
+              "Group by agent for agent-level analysis."
+            ],
+            "synonyms": [
+              "agent",
+              "rep",
+              "representative"
+            ]
+          },
+          {
+            "id": "5702b566a8b04b758e5bcaba5238a6c8",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment.`sentiment_overall`"
+            ],
+            "display_name": "Overall Sentiment",
+            "instruction": [
+              "Group by sentiment: positive, neutral, negative, mixed."
+            ],
+            "synonyms": [
+              "sentiment",
+              "caller mood",
+              "overall sentiment"
+            ]
+          },
+          {
+            "id": "ab680565582643b1a1f3f946d3e07f9c",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`call_type`"
+            ],
+            "display_name": "Call Type",
+            "instruction": [
+              "Group by call type: prior_auth_inquiry, claims_status, eligibility_check, benefit_inquiry, provider_enrollment."
+            ],
+            "synonyms": [
+              "call type",
+              "inquiry type",
+              "reason for call"
+            ]
+          },
+          {
+            "id": "ef69a169904b4cda97f59fab3ac919af",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`agency_name`"
+            ],
+            "display_name": "Agency Name",
+            "instruction": [
+              "Group by partner agency for agency comparison."
+            ],
+            "synonyms": [
+              "agency",
+              "partner agency",
+              "call center",
+              "outsourcer"
+            ]
+          }
+        ],
+        "measures": [
+          {
+            "id": "3ef6219a624a4f56bcc852dab2f1de09",
+            "sql": [
+              "COUNT(CASE WHEN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`disposition` = 'escalated' THEN 1 END)"
+            ],
+            "display_name": "Escalation Count",
+            "instruction": [
+              "Use for escalations, supervisor transfers, or escalated call counts."
+            ],
+            "synonyms": [
+              "escalations",
+              "escalated",
+              "supervisor transfers"
+            ]
+          },
+          {
+            "id": "78b81e9287e849b3aa9cf6c396e94944",
+            "sql": [
+              "ROUND(AVG(serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`call_score`), 1)"
+            ],
+            "display_name": "Average Call Score",
+            "instruction": [
+              "Use for average quality score, mean score, or overall call quality."
+            ],
+            "synonyms": [
+              "average score",
+              "mean score",
+              "quality score",
+              "call quality"
+            ]
+          },
+          {
+            "id": "a3d0c301720443418abadd6b58876342",
+            "sql": [
+              "COUNT(CASE WHEN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`outcome_bucket` = 'high_risk' THEN 1 END)"
+            ],
+            "display_name": "High Risk Call Count",
+            "instruction": [
+              "Use for high risk calls, failed calls, or calls below 70."
+            ],
+            "synonyms": [
+              "high risk calls",
+              "failed calls",
+              "problem calls",
+              "below threshold"
+            ]
+          },
+          {
+            "id": "b52c3c9f3c6144bd928a8467f60f0b8f",
+            "sql": [
+              "ROUND(100.0 * SUM(CASE WHEN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`outcome_bucket` = 'compliant' THEN 1 ELSE 0 END) / COUNT(*), 2)"
+            ],
+            "display_name": "Compliance Rate %",
+            "instruction": [
+              "Use for compliance rate, compliance percentage, or what fraction are compliant."
+            ],
+            "synonyms": [
+              "compliance rate",
+              "compliant percentage",
+              "pass rate"
+            ]
+          },
+          {
+            "id": "d2db2fb447024dae85412adffb1ec0dd",
+            "sql": [
+              "MAX(serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily.`days_below_threshold`)"
+            ],
+            "display_name": "Max Consecutive Days Below Threshold",
+            "instruction": [
+              "Use for longest streak, worst compliance streak, or consecutive days below 85%."
+            ],
+            "synonyms": [
+              "longest streak",
+              "consecutive days",
+              "streak length",
+              "days below"
+            ]
+          }
+        ]
+      }
+    },
+    "benchmarks": {
+      "questions": [
+        {
+          "id": "f6cace700f01477d9dabc2aadc212ab9",
+          "question": [
+            "Which call type has the most escalations?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT call_type, COUNT(*) AS escalation_count\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n",
+                "WHERE disposition = 'escalated'\n",
+                "GROUP BY call_type\n",
+                "ORDER BY escalation_count DESC\n",
+                "LIMIT 1\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "f0cb7bab9ef3462782432852daefc43a",
+          "question": [
+            "Show me the top 5 agents by score in each agency"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT agent_name, agency_name, agent_avg_score, agent_rank_in_agency\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n",
+                "WHERE agent_rank_in_agency <= 5\n",
+                "GROUP BY agent_name, agency_name, agent_avg_score, agent_rank_in_agency\n",
+                "ORDER BY agency_name, agent_rank_in_agency\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "a3a4d7397d2f4ea48be8f6de990dce41",
+          "question": [
+            "What percentage of calls are high risk?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT ROUND(100.0 * SUM(CASE WHEN outcome_bucket = 'high_risk' THEN 1 ELSE 0 END) / COUNT(*), 2) AS high_risk_pct\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "98c3794539eb4e5ebded2e1b6cdf34a8",
+          "question": [
+            "How many calls have declining sentiment?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT COUNT(*) AS declining_calls\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment\n",
+                "WHERE sentiment_trajectory = 'declining'\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "7d93eeeca84049d89cacac6e1ce11baa",
+          "question": [
+            "What is the week-over-week compliance change by agency?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT agency_name, day, compliance_rate, prev_week_compliance, wow_compliance_change\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily\n",
+                "WHERE prev_week_compliance IS NOT NULL\n",
+                "ORDER BY day DESC, agency_name\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "7652abaeeb07474da555b6f1488cca90",
+          "question": [
+            "Which agency has the best compliance rate?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT agency_name, ROUND(AVG(compliance_rate), 4) AS avg_compliance\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily\n",
+                "GROUP BY agency_name\n",
+                "ORDER BY avg_compliance DESC\n",
+                "LIMIT 1\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "6b8ad90a88284b17b597cd02c34ea730",
+          "question": [
+            "What is the overall average call quality score?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT ROUND(AVG(call_score), 1) AS avg_score\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "03d60b1f0636485191e75c6037b8ba15",
+          "question": [
+            "Are there agencies with compliance below 85% for more than 3 consecutive days?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT DISTINCT agency_name, call_type, MAX(days_below_threshold) AS max_streak\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily\n",
+                "WHERE days_below_threshold > 3\n",
+                "GROUP BY agency_name, call_type\n",
+                "ORDER BY max_streak DESC\n"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

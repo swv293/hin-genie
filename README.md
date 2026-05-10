@@ -92,17 +92,39 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
    -- Run sql/00_create_schemas.sql in a Databricks SQL editor
    ```
 
-3. **Create Genie views** -- Deploy all 8 curated views:
+3. **Create Genie views** -- Deploy all 8 curated views + 3 metric views:
    ```sql
    -- Run sql/01_create_genie_views.sql in a Databricks SQL editor
    ```
 
-4. **Create Genie Rooms** -- Use the room creation script to provision both rooms via API:
+4. **Annotate the source tables** -- Propagate column-level comments to the underlying `pipeline_prd.*` tables (improves downstream tooling and any future view that joins these tables):
+   ```sql
+   -- Run sql/02_source_table_comments.sql
+   ```
+
+5. **Wire up multi-payer access control** -- Create the access mapping table and the row-filter function:
+   ```sql
+   -- Run sql/03_payer_access_filter.sql
+   ```
+
+6. **Create Genie Rooms** -- Idempotent: re-running preserves any in-room curation:
    ```bash
    python genie_config/create_rooms.py
    ```
 
-5. **Validate** -- Open each room URL and ask a test question (e.g., "How many documents came in yesterday?" or "Which agents have the lowest compliance scores?").
+7. **Validate** -- Open each room URL and ask a test question (e.g., "How many documents came in yesterday?" or "Which agents have the lowest compliance scores?").
+
+### Maintaining the rooms over time
+
+Each room's full configuration — instructions, sample queries, joins, filters, expressions, measures, benchmarks — is exported to JSON in `genie_config/`:
+
+```bash
+python genie_config/export_rooms.py
+```
+
+Run this after any UI edit so the repo stays the source of truth. The exported JSON files (`room1_curation.json`, `room2_curation.json`) are the canonical reference for what each room should contain.
+
+A longer-form domain reference for both rooms (Fellegi-Sunter primer, channel definitions, risk-tier ladder, cross-room investigative patterns) lives at `docs/genie_knowledge_store.md`.
 
 ## Schema Inventory
 
@@ -160,12 +182,19 @@ DROP SCHEMA <catalog>.genie_availity_ops CASCADE;
 .
 ├── README.md
 ├── notebooks/
-│   └── setup_genie_rooms.py     # All-in-one Databricks notebook (import & run)
+│   └── setup_genie_rooms.py        # All-in-one Databricks notebook (import & run)
 ├── data_generator/
-│   └── generate_all.py          # Standalone synthetic data generator
+│   └── generate_all.py             # Standalone synthetic data generator
+├── docs/
+│   └── genie_knowledge_store.md    # Domain reference (jargon, tiers, cross-room patterns)
 ├── sql/
-│   ├── 00_create_schemas.sql    # Schema DDL
-│   └── 01_create_genie_views.sql # 8 Genie views + 3 metric views
+│   ├── 00_create_schemas.sql       # Schema DDL
+│   ├── 01_create_genie_views.sql   # 8 Genie views + 3 metric views
+│   ├── 02_source_table_comments.sql # Column comments on pipeline_prd tables
+│   └── 03_payer_access_filter.sql  # Multi-payer mapping table + row-filter function
 └── genie_config/
-    └── create_rooms.py          # Genie Room provisioning via API (CLI)
+    ├── create_rooms.py             # Idempotent Genie Room provisioning (preserves curation)
+    ├── export_rooms.py             # Pull live curation back to JSON (run after UI edits)
+    ├── room1_curation.json         # Full curation export for Room 1 (source of truth)
+    └── room2_curation.json         # Full curation export for Room 2 (source of truth)
 ```

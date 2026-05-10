@@ -1,0 +1,654 @@
+{
+  "space_id": "01f13f17036e100f9a7e09b2ec0393ab",
+  "title": "Clinical Document Processing Intelligence",
+  "description": "Analytics for a national health information network / clearinghouse that processes billions of clinical, administrative, and financial transactions per year \u2014 eligibility checks, claims, prior authorizations, remittance advice \u2014 connecting health plans, providers, and health IT vendors through a single multi-payer portal and API layer.\n\nThe core operational challenge: clinical documents (faxes, prior auth forms, lab results, imaging reports, discharge summaries) arrive from thousands of provider sources via four intake channels and must be OCR-parsed, identity-matched to members and authorizations using Fellegi-Sunter probabilistic scoring, and routed to the correct payer workflow \u2014 accurately, at scale, under SLA.\n\nThis room surfaces intake volume trends, OCR quality monitoring, member and authorization match outcomes with risk tiering, data quality degradation detection, and pipeline KPIs. Built for ops leaders, utilization management staff, and product managers.",
+  "warehouse_id": "084543d48aafaeb2",
+  "serialized_space": {
+    "version": 2,
+    "config": {
+      "sample_questions": [
+        {
+          "id": "1ee6e746b98e4e7ebeff9fda7bfe3b84",
+          "question": [
+            "Document risk tier breakdown"
+          ]
+        },
+        {
+          "id": "2bbd6ee54b32473199cd22747c9853eb",
+          "question": [
+            "Authorization match trend week over week"
+          ]
+        },
+        {
+          "id": "3c0fa553d4714985a7bf53991940c8ae",
+          "question": [
+            "Which document types have the worst match rate?"
+          ]
+        },
+        {
+          "id": "3ffe7b52686e496187e898c1fe851416",
+          "question": [
+            "What is our overall document match rate?"
+          ]
+        },
+        {
+          "id": "4e6a6c3b1df745fba634d03618a8d298",
+          "question": [
+            "Were there any volume spikes this week?"
+          ]
+        },
+        {
+          "id": "6cb2ed2c7bca4407a1fcdef5e4136676",
+          "question": [
+            "Is our data quality degrading?"
+          ]
+        },
+        {
+          "id": "973b46f5347b49c198c1f4b58a20829f",
+          "question": [
+            "Documents missing both DOB and SSN4"
+          ]
+        },
+        {
+          "id": "aeb179738d4b42bb9957a2e4e2d4a2d4",
+          "question": [
+            "Fax vs electronic match quality comparison"
+          ]
+        },
+        {
+          "id": "f096e9e3f1f64b18a1a153f5a57ee860",
+          "question": [
+            "Show me the current pipeline KPIs"
+          ]
+        },
+        {
+          "id": "fdb202deb56a4e8cb10dc7ea216396d2",
+          "question": [
+            "How many documents came in yesterday?"
+          ]
+        }
+      ]
+    },
+    "data_sources": {
+      "tables": [
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_auth_match_daily"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_pipeline_snapshot"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_doc_intake_metrics"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_doc_match_metrics"
+        }
+      ]
+    },
+    "instructions": {
+      "text_instructions": [
+        {
+          "id": "748464006b114b9d87df9f6e7b972d15",
+          "content": [
+            "## Who uses this room\n",
+            "Operations leaders, utilization management analysts, and product managers at a national health information network that processes billions of clinical and administrative transactions per year connecting health plans, providers, and health IT vendors through a single multi-payer portal. Core challenge: clinical documents (faxes, prior auth forms, lab results, discharge summaries) must be parsed, identity-matched to members and authorizations, and routed under SLA.\n",
+            "\n",
+            "## Jargon\n",
+            "- Fellegi-Sunter: probabilistic record linkage. Higher total_weight = stronger match.\n",
+            "- match_class: 'match' (high confidence), 'possible_match' (human review), 'non_match'.\n",
+            "- doc_risk_tier: 'Unreadable' / 'High Risk - No Anchors' (DOB+SSN4 missing) / 'Medium Risk - One Anchor' / 'Low Risk - Both Anchors'.\n",
+            "- Prior auth (PA): payer approval before a medical service.\n",
+            "- NPI: National Provider Identifier (10 digits). MRM: Medical Records Management. OCR: Optical Character Recognition.\n",
+            "- Intake channel: fax, electronic (EDI), upload, mail.\n",
+            "\n",
+            "## Guardrails\n",
+            "- Never expose or guess member names, SSNs, DOB, or any PHI.\n",
+            "- 'match rate' = member match rate unless specified.\n",
+            "- Default date range: last 30 days.\n",
+            "- is_volume_spike = total_docs > 2x 7-day rolling avg. dq_degradation_flag = pct_unreadable > 1.5x rolling avg.\n",
+            "- genie_pipeline_snapshot has no date dimension \u2014 never use for trends.\n",
+            "- Window columns are pre-computed. Use directly.\n",
+            "\n",
+            "## Beyond this room\n",
+            "Call center quality/compliance/sentiment: 'Provider Support & Call Intelligence' room.\n"
+          ]
+        }
+      ],
+      "example_question_sqls": [
+        {
+          "id": "353e3faf1c504004a6f5ff8436a11c7b",
+          "question": [
+            "Match rate by document type"
+          ],
+          "sql": [
+            "SELECT document_type, COUNT(*) AS total_docs, ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2) AS match_rate_pct FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail GROUP BY document_type ORDER BY match_rate_pct"
+          ],
+          "usage_guidance": [
+            "Use for match rate comparisons across document types"
+          ]
+        },
+        {
+          "id": "a4cf378ea340424bbdf04db199fc0660",
+          "question": [
+            "Intake volume trend last 30 days"
+          ],
+          "sql": [
+            "SELECT intake_date, total_docs, rolling_7d_avg, rolling_30d_avg, is_volume_spike FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily WHERE intake_date >= CURRENT_DATE - INTERVAL 30 DAYS ORDER BY intake_date"
+          ],
+          "usage_guidance": [
+            "Use for volume trends, daily intake, or time-series document questions"
+          ]
+        },
+        {
+          "id": "e6546151c1e9498592d1bc7589f33c39",
+          "question": [
+            "Days where data quality degradation was detected"
+          ],
+          "sql": [
+            "SELECT parse_date, pct_unreadable, rolling_7d_unreadable_pct, unreadable_trend_3d FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily WHERE dq_degradation_flag = true ORDER BY parse_date DESC"
+          ],
+          "usage_guidance": [
+            "Use for quality alerts, degradation events, or OCR problem detection"
+          ]
+        },
+        {
+          "id": "ea22af3ba73945c787f6bbf250259a59",
+          "question": [
+            "Auth match trend week over week"
+          ],
+          "sql": [
+            "SELECT match_date, match_class, candidate_count, prev_week_count, wow_change_pct, daily_class_share FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_auth_match_daily WHERE match_date >= CURRENT_DATE - INTERVAL 14 DAYS ORDER BY match_date, match_class"
+          ],
+          "usage_guidance": [
+            "Use for auth match WoW comparison or authorization trend analysis"
+          ]
+        },
+        {
+          "id": "efde15db1de24d4eb97400814303eec6",
+          "question": [
+            "Document risk tier breakdown"
+          ],
+          "sql": [
+            "SELECT doc_risk_tier, COUNT(*) AS doc_count, ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail GROUP BY doc_risk_tier ORDER BY doc_count DESC"
+          ],
+          "usage_guidance": [
+            "Use for risk distribution, risk summary, or risk tier questions"
+          ]
+        }
+      ],
+      "join_specs": [
+        {
+          "id": "520591e4684c4d469363a5e5be81b260",
+          "left": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_auth_match_daily",
+            "alias": "genie_auth_match_daily"
+          },
+          "right": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily",
+            "alias": "genie_doc_intake_daily"
+          },
+          "sql": [
+            "`genie_auth_match_daily`.`match_date` = `genie_doc_intake_daily`.`intake_date`",
+            "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+          ],
+          "comment": [
+            "Multiple auth match classes per intake day"
+          ],
+          "instruction": [
+            "Use when correlating authorization match volumes with document intake on the same day"
+          ]
+        },
+        {
+          "id": "c3b6cd9f268f43148ccf60eb1616208a",
+          "left": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail",
+            "alias": "genie_doc_match_detail"
+          },
+          "right": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily",
+            "alias": "genie_doc_intake_daily"
+          },
+          "sql": [
+            "`genie_doc_match_detail`.`intake_date` = `genie_doc_intake_daily`.`intake_date`",
+            "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
+          ],
+          "comment": [
+            "Many match-detail rows per intake day"
+          ],
+          "instruction": [
+            "Use when combining per-document match results with daily aggregate intake volumes"
+          ]
+        },
+        {
+          "id": "dac7536e009c47459cc42fa803582750",
+          "left": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily",
+            "alias": "genie_data_quality_daily"
+          },
+          "right": {
+            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily",
+            "alias": "genie_doc_intake_daily"
+          },
+          "sql": [
+            "`genie_data_quality_daily`.`parse_date` = `genie_doc_intake_daily`.`intake_date`",
+            "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--"
+          ],
+          "comment": [
+            "One quality row per intake day"
+          ],
+          "instruction": [
+            "Use when correlating OCR quality metrics with document intake volumes on the same day"
+          ]
+        }
+      ],
+      "sql_snippets": {
+        "filters": [
+          {
+            "id": "17dc2a46498d4db7a96c5e7c8b80ff12",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily.`dq_degradation_flag` = true"
+            ],
+            "display_name": "Quality Degradation Days",
+            "instruction": [
+              "Use when user asks about quality drops, degradation alerts, or OCR problems."
+            ],
+            "synonyms": [
+              "degradation",
+              "quality drop",
+              "OCR degrading"
+            ]
+          },
+          {
+            "id": "754b1408786447f69627258b9779b9ab",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`source_channel` = 'fax'"
+            ],
+            "display_name": "Fax Channel Only",
+            "instruction": [
+              "Use when user asks specifically about fax documents or fax channel."
+            ],
+            "synonyms": [
+              "fax",
+              "faxed documents",
+              "fax channel"
+            ]
+          },
+          {
+            "id": "803fd34b139e47d591c36b6ad6b0243a",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily.`is_volume_spike` = true"
+            ],
+            "display_name": "Volume Spike Days",
+            "instruction": [
+              "Use when user asks about spikes, anomalies, or unusually high volume days."
+            ],
+            "synonyms": [
+              "spike",
+              "anomaly",
+              "surge",
+              "unusual volume"
+            ]
+          },
+          {
+            "id": "86eecca014e6422daf2dee5f64450b6b",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`doc_risk_tier` = 'High Risk - No Anchors'"
+            ],
+            "display_name": "High Risk Documents",
+            "instruction": [
+              "Use when user asks about high risk documents or documents missing both identity anchors."
+            ],
+            "synonyms": [
+              "high risk",
+              "no anchors",
+              "dangerous matches"
+            ]
+          },
+          {
+            "id": "c03849dac0534606ac98adb5f24cb6af",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`match_class` = 'non_match'"
+            ],
+            "display_name": "Non-Matched Documents",
+            "instruction": [
+              "Use when user asks about failed matches, non-matches, or unmatched documents."
+            ],
+            "synonyms": [
+              "non match",
+              "unmatched",
+              "failed match",
+              "no match"
+            ]
+          }
+        ],
+        "expressions": [
+          {
+            "id": "0206c0b505ad4b77b93a6facd43b685b",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`doc_risk_tier`"
+            ],
+            "display_name": "Risk Tier",
+            "instruction": [
+              "Group by risk classification: Unreadable, High Risk - No Anchors, Medium Risk - One Anchor, Low Risk - Both Anchors."
+            ],
+            "synonyms": [
+              "risk tier",
+              "risk level",
+              "risk category"
+            ]
+          },
+          {
+            "id": "5739d81026114acf9f925357487d83a3",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`match_class`"
+            ],
+            "display_name": "Match Classification",
+            "instruction": [
+              "Group by Fellegi-Sunter match class: match, possible_match, non_match."
+            ],
+            "synonyms": [
+              "match class",
+              "match type",
+              "match category",
+              "match result"
+            ]
+          },
+          {
+            "id": "a53d9d5d2660492290878f6fc81b1417",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`document_type`"
+            ],
+            "display_name": "Document Type",
+            "instruction": [
+              "Group by document type: prior_auth_form, clinical_note, lab_result, imaging_report, discharge_summary."
+            ],
+            "synonyms": [
+              "doc type",
+              "document type",
+              "type of document",
+              "form type"
+            ]
+          },
+          {
+            "id": "ede7b2d8aacb4885aa14fc40f1c6b10c",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily.`intake_date`"
+            ],
+            "display_name": "Intake Date",
+            "instruction": [
+              "Use as time dimension for daily trending or date-based grouping."
+            ],
+            "synonyms": [
+              "date",
+              "day",
+              "intake date",
+              "received date"
+            ]
+          },
+          {
+            "id": "f7d015ea601a446bb7164eb53f0c6e0d",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`source_channel`"
+            ],
+            "display_name": "Source Channel",
+            "instruction": [
+              "Group by intake channel: fax, electronic, upload, mail."
+            ],
+            "synonyms": [
+              "channel",
+              "source",
+              "intake channel",
+              "how received"
+            ]
+          }
+        ],
+        "measures": [
+          {
+            "id": "08acc822c8df46aca10c7695dc1fb3cc",
+            "sql": [
+              "ROUND(100.0 * SUM(CASE WHEN serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`match_class` = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2)"
+            ],
+            "display_name": "Member Match Rate %",
+            "instruction": [
+              "Use for match rate, match percentage, or how many documents matched. Returns a percentage."
+            ],
+            "synonyms": [
+              "match rate",
+              "match percentage",
+              "matched docs",
+              "match success rate"
+            ]
+          },
+          {
+            "id": "3a9104d28227462aa5dc481175310370",
+            "sql": [
+              "ROUND(100.0 * SUM(CASE WHEN serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`doc_risk_tier` = 'High Risk - No Anchors' THEN 1 ELSE 0 END) / COUNT(*), 2)"
+            ],
+            "display_name": "High Risk Document %",
+            "instruction": [
+              "Use for high risk percentage, documents missing anchors, or risk exposure."
+            ],
+            "synonyms": [
+              "high risk rate",
+              "risky docs",
+              "missing anchors",
+              "risk percentage"
+            ]
+          },
+          {
+            "id": "3d0e81998dca4739bbf986d9de251645",
+            "sql": [
+              "ROUND(AVG(serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`match_weight`), 2)"
+            ],
+            "display_name": "Average Fellegi-Sunter Weight",
+            "instruction": [
+              "Use for average match score, Fellegi-Sunter score, or match strength."
+            ],
+            "synonyms": [
+              "match score",
+              "FS weight",
+              "match strength",
+              "Fellegi-Sunter score"
+            ]
+          },
+          {
+            "id": "3e14780d7285427b95171edf13d2e335",
+            "sql": [
+              "ROUND(AVG(serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily.`avg_quality_score`), 3)"
+            ],
+            "display_name": "Average OCR Quality Score",
+            "instruction": [
+              "Use for OCR quality, parsing quality, or scan quality questions. Score is 0.0 to 1.0."
+            ],
+            "synonyms": [
+              "OCR quality",
+              "scan quality",
+              "parse quality",
+              "quality score"
+            ]
+          },
+          {
+            "id": "7b754278366548fcb1b0f112ad2768e5",
+            "sql": [
+              "ROUND(100.0 * SUM(CASE WHEN NOT serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`missing_dob` AND NOT serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`missing_ssn4` THEN 1 ELSE 0 END) / COUNT(*), 2)"
+            ],
+            "display_name": "Extraction Completeness %",
+            "instruction": [
+              "Use for extraction completeness, how many documents have both anchors, or data quality completeness."
+            ],
+            "synonyms": [
+              "extraction completeness",
+              "anchor completeness",
+              "both anchors",
+              "complete extractions"
+            ]
+          },
+          {
+            "id": "8cf635233b6247fe918c71c529592c52",
+            "sql": [
+              "SUM(serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily.`total_docs`)"
+            ],
+            "display_name": "Total Documents Received",
+            "instruction": [
+              "Use for total document volume, intake count, or how many documents questions."
+            ],
+            "synonyms": [
+              "total docs",
+              "document count",
+              "intake volume",
+              "documents received"
+            ]
+          }
+        ]
+      }
+    },
+    "benchmarks": {
+      "questions": [
+        {
+          "id": "fe0628a85c9f40469d1bb9f1d9e1e349",
+          "question": [
+            "Are there any data quality degradation events in the last 14 days?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT parse_date, pct_unreadable, rolling_7d_unreadable_pct, unreadable_trend_3d\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily\n",
+                "WHERE dq_degradation_flag = true\n",
+                "  AND parse_date >= CURRENT_DATE - INTERVAL 14 DAYS\n",
+                "ORDER BY parse_date DESC\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "9a3ac6ec244a4d429e0eea2e558dfab6",
+          "question": [
+            "How many documents were received in the last 7 days?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT SUM(total_docs) AS docs_last_7_days\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily\n",
+                "WHERE intake_date >= CURRENT_DATE - INTERVAL 7 DAYS\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "63a42160f407464bbc7193e16ecf01c8",
+          "question": [
+            "Fax vs electronic match quality comparison"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT source_channel, COUNT(*) AS total,\n",
+                "  ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2) AS match_rate_pct\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n",
+                "WHERE source_channel IN ('fax', 'electronic')\n",
+                "GROUP BY source_channel\n",
+                "ORDER BY match_rate_pct DESC\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "4807023cd75842129599186c53ad4c2c",
+          "question": [
+            "What are the current pipeline KPIs?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT metric_name, CAST(metric_value AS BIGINT) AS value, metric_unit\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_pipeline_snapshot\n",
+                "ORDER BY metric_name\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "4438fe0a4b3e4606a44d0eefc372b593",
+          "question": [
+            "What is the overall document match rate?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2) AS match_rate_pct\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "434b297a80a74784be0a28f8fa15fa7b",
+          "question": [
+            "Which source channel has the highest average match weight?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT source_channel, ROUND(AVG(match_weight), 2) AS avg_weight\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n",
+                "GROUP BY source_channel\n",
+                "ORDER BY avg_weight DESC\n",
+                "LIMIT 1\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "35964225334b4c929047a2f6943e6dc9",
+          "question": [
+            "Show me the top 5 volume spike days"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT intake_date, total_docs, rolling_7d_avg, day_over_day_pct\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily\n",
+                "WHERE is_volume_spike = true\n",
+                "ORDER BY total_docs DESC\n",
+                "LIMIT 5\n"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2cb354db6e2b46a480e927d655836f92",
+          "question": [
+            "What percentage of documents are High Risk?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT ROUND(100.0 * SUM(CASE WHEN doc_risk_tier = 'High Risk - No Anchors' THEN 1 ELSE 0 END) / COUNT(*), 2) AS high_risk_pct\n",
+                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
