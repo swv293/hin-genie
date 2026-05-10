@@ -107,10 +107,19 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
    -- Run sql/03_payer_access_filter.sql
    ```
 
-6. **Create Genie Rooms** -- Idempotent: re-running preserves any in-room curation:
+6. **Create Genie Rooms** -- Two options:
+
+   **From a workstation (CLI):**
    ```bash
    python genie_config/create_rooms.py
    ```
+   This is idempotent and preserves existing curation.
+
+   **From the workspace (notebooks, no DABs needed):**
+   - `notebooks/create_room1_doc_processing.py` — provisions Room 1 with full curation in a single API call.
+   - `notebooks/create_room2_provider_support.py` — provisions Room 2 the same way.
+
+   Each notebook reads its `genie_config/roomN_curation.json`, rewrites table identifiers to the catalog/schema you set in the widgets, and `POST`s the room with `serialized_space` so it ships fully curated — no manual UI import. Re-running is a no-op unless you set `refresh_existing=yes`.
 
 7. **Validate** -- Open each room URL and ask a test question (e.g., "How many documents came in yesterday?" or "Which agents have the lowest compliance scores?").
 
@@ -182,7 +191,9 @@ DROP SCHEMA <catalog>.genie_availity_ops CASCADE;
 .
 ├── README.md
 ├── notebooks/
-│   └── setup_genie_rooms.py        # All-in-one Databricks notebook (import & run)
+│   ├── setup_genie_rooms.py             # All-in-one Databricks notebook (import & run)
+│   ├── create_room1_doc_processing.py   # Room 1 only — fully curated provisioning
+│   └── create_room2_provider_support.py # Room 2 only — fully curated provisioning
 ├── data_generator/
 │   └── generate_all.py             # Standalone synthetic data generator
 ├── docs/
