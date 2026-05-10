@@ -65,9 +65,11 @@ flowchart LR
 
 ## Prerequisites
 
-- **Databricks workspace** with Unity Catalog enabled
-- **Serverless SQL warehouse** (or any SQL warehouse with access to the catalog)
-- **Unity Catalog** catalog provisioned (default: `serverless_stable_swv01_catalog`)
+Works on **any Databricks workspace** with Unity Catalog enabled. If you don't have one, sign up for [Databricks Free Edition](https://www.databricks.com/learn/free-edition) — no credit card, single-user workspace with a serverless SQL warehouse pre-provisioned.
+
+- **A Databricks workspace** with Unity Catalog enabled
+- **Serverless SQL warehouse** (or any SQL warehouse with access to your catalog)
+- A **Unity Catalog catalog** you can write to (Free Edition gives you a `workspace` catalog by default)
 - Python 3.10+ with `faker`, `pandas`, `numpy` installed (for data generation — generates 12 source tables)
 
 ## Quick Start
@@ -133,7 +135,7 @@ Audience: Ops leaders, utilization management staff, product managers.
 
 Covers document intake volume, OCR quality, Fellegi-Sunter match outcomes, authorization match trends, and pipeline KPIs. Five curated views with window functions for trend analysis, spike detection, and risk tiering.
 
-**URL**: [Open Room 1](https://fevm-serverless-stable-swv01.cloud.databricks.com/genie/rooms/01f13f17036e100f9a7e09b2ec0393ab)
+**URL**: `genie_config/create_rooms.py` (or the all-in-one notebook) prints the room URL on your workspace after provisioning. URLs follow the pattern `https://<your-workspace>.cloud.databricks.com/genie/rooms/<room_id>`.
 
 ### Room 2: Provider Support & Call Intelligence
 
@@ -141,14 +143,15 @@ Audience: Call center supervisors, QA analysts, provider relations.
 
 Covers call quality scoring, agent performance rankings, AI-generated sentiment analysis, and compliance tracking with consecutive-day streak detection.
 
-**URL**: [Open Room 2](https://fevm-serverless-stable-swv01.cloud.databricks.com/genie/rooms/01f13f1703ce199ebd91803207433969)
+**URL**: same — printed by `create_rooms.py` / the notebook on your own workspace.
 
 ## Teardown
 
 All objects live in a single schema. To remove everything without affecting source tables, pipelines, or dashboards:
 
 ```sql
-DROP SCHEMA serverless_stable_swv01_catalog.genie_availity_ops CASCADE;
+-- Replace <catalog> with the catalog you set in the notebook / scripts.
+DROP SCHEMA <catalog>.genie_availity_ops CASCADE;
 ```
 
 ## Repo Structure
