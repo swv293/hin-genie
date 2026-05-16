@@ -8,9 +8,9 @@
     "config": {
       "sample_questions": [
         {
-          "id": "1ee6e746b98e4e7ebeff9fda7bfe3b84",
+          "id": "44393831fa4c4550a2af4f207f646385",
           "question": [
-            "Document risk tier breakdown"
+            "Are we hitting the CMS 72-hour urgent PA SLA?"
           ]
         },
         {
@@ -20,27 +20,9 @@
           ]
         },
         {
-          "id": "3c0fa553d4714985a7bf53991940c8ae",
+          "id": "1ee6e746b98e4e7ebeff9fda7bfe3b84",
           "question": [
-            "Which document types have the worst match rate?"
-          ]
-        },
-        {
-          "id": "3ffe7b52686e496187e898c1fe851416",
-          "question": [
-            "What is our overall document match rate?"
-          ]
-        },
-        {
-          "id": "4e6a6c3b1df745fba634d03618a8d298",
-          "question": [
-            "Were there any volume spikes this week?"
-          ]
-        },
-        {
-          "id": "6cb2ed2c7bca4407a1fcdef5e4136676",
-          "question": [
-            "Is our data quality degrading?"
+            "Document risk tier breakdown"
           ]
         },
         {
@@ -56,15 +38,63 @@
           ]
         },
         {
-          "id": "f096e9e3f1f64b18a1a153f5a57ee860",
+          "id": "cd2914bff8b6412ebfb550d3c19e9700",
           "question": [
-            "Show me the current pipeline KPIs"
+            "How long is the average PA decision time per payer?"
           ]
         },
         {
           "id": "fdb202deb56a4e8cb10dc7ea216396d2",
           "question": [
             "How many documents came in yesterday?"
+          ]
+        },
+        {
+          "id": "6cb2ed2c7bca4407a1fcdef5e4136676",
+          "question": [
+            "Is our data quality degrading?"
+          ]
+        },
+        {
+          "id": "32cc4ca36c9847b5926a0a8c8c34a677",
+          "question": [
+            "Show me payer mix by document volume"
+          ]
+        },
+        {
+          "id": "f096e9e3f1f64b18a1a153f5a57ee860",
+          "question": [
+            "Show me the current pipeline KPIs"
+          ]
+        },
+        {
+          "id": "4e6a6c3b1df745fba634d03618a8d298",
+          "question": [
+            "Were there any volume spikes this week?"
+          ]
+        },
+        {
+          "id": "3040a629aa3c4283bbcc3a0632aae2ee",
+          "question": [
+            "What is our PA SLA compliance rate by urgency?"
+          ]
+        },
+        {
+          "id": "3ffe7b52686e496187e898c1fe851416",
+          "question": [
+            "What is our overall document match rate?"
+          ]
+        },
+        {
+          "id": "3c0fa553d4714985a7bf53991940c8ae",
+          "question": [
+            "Which document types have the worst match rate?"
+          ]
+        },
+        {
+          "id": "998500a631cb4aada2de1a8cf7159ca5",
+          "question": [
+            "Which payer has the lowest approval rate?"
           ]
         }
       ]
@@ -84,6 +114,12 @@
           "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail"
         },
         {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_pa_decisions_daily"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_payer_mix"
+        },
+        {
           "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_pipeline_snapshot"
         },
         {
@@ -91,39 +127,65 @@
         },
         {
           "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_doc_match_metrics"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_pa_metrics"
+        },
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_payer_mix_metrics"
         }
       ]
     },
     "instructions": {
       "text_instructions": [
         {
-          "id": "748464006b114b9d87df9f6e7b972d15",
+          "id": "93494cc850ec462db2afad659a17cea0",
           "content": [
             "## Who uses this room\n",
-            "Operations leaders, utilization management analysts, and product managers at a national health information network that processes billions of clinical and administrative transactions per year connecting health plans, providers, and health IT vendors through a single multi-payer portal. Core challenge: clinical documents (faxes, prior auth forms, lab results, discharge summaries) must be parsed, identity-matched to members and authorizations, and routed under SLA.\n",
+            "Operations leaders, utilization management analysts, PA program owners, and product managers at a national health information network. Core challenge: clinical documents arrive from thousands of provider sources via four intake channels (fax, electronic, upload, mail) and must be OCR-parsed, identity-matched to members and authorizations using Fellegi-Sunter scoring, and routed to the correct payer workflow under SLA.\n",
             "\n",
-            "## Jargon\n",
+            "## Domain dictionary\n",
             "- Fellegi-Sunter: probabilistic record linkage. Higher total_weight = stronger match.\n",
             "- match_class: 'match' (high confidence), 'possible_match' (human review), 'non_match'.\n",
             "- doc_risk_tier: 'Unreadable' / 'High Risk - No Anchors' (DOB+SSN4 missing) / 'Medium Risk - One Anchor' / 'Low Risk - Both Anchors'.\n",
             "- Prior auth (PA): payer approval before a medical service.\n",
-            "- NPI: National Provider Identifier (10 digits). MRM: Medical Records Management. OCR: Optical Character Recognition.\n",
+            "- urgency: 'urgent' = 72-hour CMS SLA, 'standard' = 7-day CMS SLA (CMS-0057-F, effective 2026).\n",
+            "- payer_code: one of AETNA, UHC, BCBS, CIGNA, HUMANA. Each user only sees their authorized payers via Unity Catalog row filters.\n",
+            "- NPI: National Provider Identifier (10 digits). OCR: Optical Character Recognition.\n",
             "- Intake channel: fax, electronic (EDI), upload, mail.\n",
+            "\n",
+            "## SOURCE PREFERENCE (critical for accuracy)\n",
+            "- For aggregates like approval rate, SLA compliance, match rate, unreadable rate \u2014 prefer MEASURE(<measure_name>) against the appropriate metric view (mv_pa_metrics, mv_doc_match_metrics, mv_doc_intake_metrics, mv_payer_mix_metrics).\n",
+            "- The metric view encapsulates the canonical business definition. Do NOT recompute the aggregation from base views unless the user asks for row-level detail.\n",
+            "- MEASURE() aliases are NOT visible in HAVING. Always wrap MEASURE() in a CTE and filter / order in the outer SELECT.\n",
             "\n",
             "## Guardrails\n",
             "- Never expose or guess member names, SSNs, DOB, or any PHI.\n",
-            "- 'match rate' = member match rate unless specified.\n",
-            "- Default date range: last 30 days.\n",
+            "- 'Match rate' = member match rate unless specified.\n",
+            "- Default date range: last 30 days unless the user specifies.\n",
             "- is_volume_spike = total_docs > 2x 7-day rolling avg. dq_degradation_flag = pct_unreadable > 1.5x rolling avg.\n",
             "- genie_pipeline_snapshot has no date dimension \u2014 never use for trends.\n",
             "- Window columns are pre-computed. Use directly.\n",
+            "- The CMS 2026 prior-authorization rule (CMS-0057-F) requires 72-hr urgent / 7-day standard turnaround. Use mv_pa_metrics.sla_compliance_pct for compliance reporting questions.\n",
             "\n",
             "## Beyond this room\n",
-            "Call center quality/compliance/sentiment: 'Provider Support & Call Intelligence' room.\n"
+            "Call center quality, compliance, sentiment, and call operations (FCR, AHT, ASA): 'Provider Support & Call Intelligence' room.\n"
           ]
         }
       ],
       "example_question_sqls": [
+        {
+          "id": "255749e841064ccfa38999c7d69e0298",
+          "question": [
+            "CMS 72-hour SLA compliance for urgent prior auths"
+          ],
+          "sql": [
+            "WITH m AS (SELECT decision_date, payer_code, MEASURE(sla_compliance_pct) AS sla_pct FROM serverless_stable_swv01_catalog.genie_availity_ops.mv_pa_metrics WHERE urgency = 'urgent' GROUP BY decision_date, payer_code) SELECT * FROM m ORDER BY decision_date DESC LIMIT 30"
+          ],
+          "usage_guidance": [
+            "Use this when the user asks about CMS 2026 PA reporting, 72-hour SLA, or urgent decisions."
+          ]
+        },
         {
           "id": "353e3faf1c504004a6f5ff8436a11c7b",
           "question": [
@@ -137,6 +199,18 @@
           ]
         },
         {
+          "id": "6db9bee868a942d39d5c607a34e60546",
+          "question": [
+            "Approval rate and SLA compliance per payer using the metric view"
+          ],
+          "sql": [
+            "WITH m AS (SELECT payer_code, MEASURE(approval_rate_pct) AS approval_pct, MEASURE(sla_compliance_pct) AS sla_pct FROM serverless_stable_swv01_catalog.genie_availity_ops.mv_pa_metrics GROUP BY payer_code) SELECT * FROM m ORDER BY approval_pct DESC"
+          ],
+          "usage_guidance": [
+            "Use mv_pa_metrics MEASURE() to get governed approval and SLA percentages per payer. Always wrap MEASURE() in a CTE before filtering or ordering."
+          ]
+        },
+        {
           "id": "a4cf378ea340424bbdf04db199fc0660",
           "question": [
             "Intake volume trend last 30 days"
@@ -146,6 +220,18 @@
           ],
           "usage_guidance": [
             "Use for volume trends, daily intake, or time-series document questions"
+          ]
+        },
+        {
+          "id": "bada21b044334db4bfcf1e8fc9928fdc",
+          "question": [
+            "Payer mix by document volume"
+          ],
+          "sql": [
+            "SELECT payer_code, total_documents, total_pa_decisions, pa_approval_rate_pct FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_payer_mix ORDER BY total_documents DESC"
+          ],
+          "usage_guidance": [
+            "Per-payer snapshot \u2014 volume, PA decisions, and approval rate. Use for questions about payer mix or which payer drives volume."
           ]
         },
         {
@@ -182,71 +268,6 @@
           ],
           "usage_guidance": [
             "Use for risk distribution, risk summary, or risk tier questions"
-          ]
-        }
-      ],
-      "join_specs": [
-        {
-          "id": "520591e4684c4d469363a5e5be81b260",
-          "left": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_auth_match_daily",
-            "alias": "genie_auth_match_daily"
-          },
-          "right": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily",
-            "alias": "genie_doc_intake_daily"
-          },
-          "sql": [
-            "`genie_auth_match_daily`.`match_date` = `genie_doc_intake_daily`.`intake_date`",
-            "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
-          ],
-          "comment": [
-            "Multiple auth match classes per intake day"
-          ],
-          "instruction": [
-            "Use when correlating authorization match volumes with document intake on the same day"
-          ]
-        },
-        {
-          "id": "c3b6cd9f268f43148ccf60eb1616208a",
-          "left": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail",
-            "alias": "genie_doc_match_detail"
-          },
-          "right": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily",
-            "alias": "genie_doc_intake_daily"
-          },
-          "sql": [
-            "`genie_doc_match_detail`.`intake_date` = `genie_doc_intake_daily`.`intake_date`",
-            "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
-          ],
-          "comment": [
-            "Many match-detail rows per intake day"
-          ],
-          "instruction": [
-            "Use when combining per-document match results with daily aggregate intake volumes"
-          ]
-        },
-        {
-          "id": "dac7536e009c47459cc42fa803582750",
-          "left": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily",
-            "alias": "genie_data_quality_daily"
-          },
-          "right": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily",
-            "alias": "genie_doc_intake_daily"
-          },
-          "sql": [
-            "`genie_data_quality_daily`.`parse_date` = `genie_doc_intake_daily`.`intake_date`",
-            "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--"
-          ],
-          "comment": [
-            "One quality row per intake day"
-          ],
-          "instruction": [
-            "Use when correlating OCR quality metrics with document intake volumes on the same day"
           ]
         }
       ],
@@ -510,145 +531,6 @@
           }
         ]
       }
-    },
-    "benchmarks": {
-      "questions": [
-        {
-          "id": "fe0628a85c9f40469d1bb9f1d9e1e349",
-          "question": [
-            "Are there any data quality degradation events in the last 14 days?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT parse_date, pct_unreadable, rolling_7d_unreadable_pct, unreadable_trend_3d\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_data_quality_daily\n",
-                "WHERE dq_degradation_flag = true\n",
-                "  AND parse_date >= CURRENT_DATE - INTERVAL 14 DAYS\n",
-                "ORDER BY parse_date DESC\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "9a3ac6ec244a4d429e0eea2e558dfab6",
-          "question": [
-            "How many documents were received in the last 7 days?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT SUM(total_docs) AS docs_last_7_days\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily\n",
-                "WHERE intake_date >= CURRENT_DATE - INTERVAL 7 DAYS\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "63a42160f407464bbc7193e16ecf01c8",
-          "question": [
-            "Fax vs electronic match quality comparison"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT source_channel, COUNT(*) AS total,\n",
-                "  ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2) AS match_rate_pct\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n",
-                "WHERE source_channel IN ('fax', 'electronic')\n",
-                "GROUP BY source_channel\n",
-                "ORDER BY match_rate_pct DESC\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "4807023cd75842129599186c53ad4c2c",
-          "question": [
-            "What are the current pipeline KPIs?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT metric_name, CAST(metric_value AS BIGINT) AS value, metric_unit\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_pipeline_snapshot\n",
-                "ORDER BY metric_name\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "4438fe0a4b3e4606a44d0eefc372b593",
-          "question": [
-            "What is the overall document match rate?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2) AS match_rate_pct\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "434b297a80a74784be0a28f8fa15fa7b",
-          "question": [
-            "Which source channel has the highest average match weight?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT source_channel, ROUND(AVG(match_weight), 2) AS avg_weight\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n",
-                "GROUP BY source_channel\n",
-                "ORDER BY avg_weight DESC\n",
-                "LIMIT 1\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "35964225334b4c929047a2f6943e6dc9",
-          "question": [
-            "Show me the top 5 volume spike days"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT intake_date, total_docs, rolling_7d_avg, day_over_day_pct\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily\n",
-                "WHERE is_volume_spike = true\n",
-                "ORDER BY total_docs DESC\n",
-                "LIMIT 5\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "2cb354db6e2b46a480e927d655836f92",
-          "question": [
-            "What percentage of documents are High Risk?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT ROUND(100.0 * SUM(CASE WHEN doc_risk_tier = 'High Risk - No Anchors' THEN 1 ELSE 0 END) / COUNT(*), 2) AS high_risk_pct\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail\n"
-              ]
-            }
-          ]
-        }
-      ]
     }
   }
 }

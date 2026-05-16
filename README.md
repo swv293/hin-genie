@@ -92,12 +92,12 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
    -- Run sql/00_create_schemas.sql in a Databricks SQL editor
    ```
 
-3. **Create Genie views** -- Deploy all 8 curated views + 3 metric views:
+3. **Create base Genie views** -- Deploy the original 8 curated views + 3 metric views:
    ```sql
    -- Run sql/01_create_genie_views.sql in a Databricks SQL editor
    ```
 
-4. **Annotate the source tables** -- Propagate column-level comments to the underlying `pipeline_prd.*` tables (improves downstream tooling and any future view that joins these tables):
+4. **Annotate the source tables** -- Propagate column-level comments to the underlying `pipeline_prd.*` tables:
    ```sql
    -- Run sql/02_source_table_comments.sql
    ```
@@ -107,21 +107,51 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
    -- Run sql/03_payer_access_filter.sql
    ```
 
-6. **Create Genie Rooms** -- Two options:
-
-   **From a workstation (CLI):**
-   ```bash
-   python genie_config/create_rooms.py
+6. **Extend with payer dimension + PA decisions + call ops** -- Adds `payer_code` across the pipeline, `urgency` to `raw.authorization`, the `call_ops_supplemental` Delta table, and backfills:
+   ```sql
+   -- Run sql/04_add_payer_pa_callops.sql
    ```
-   This is idempotent and preserves existing curation.
 
-   **From the workspace (notebooks, no DABs needed):**
-   - `notebooks/create_room1_doc_processing.py` — provisions Room 1 with full curation in a single API call.
-   - `notebooks/create_room2_provider_support.py` — provisions Room 2 the same way.
+7. **Create extended Genie views** -- New views over PA decisions, payer mix, and call ops, plus three new metric views:
+   ```sql
+   -- Run sql/05_extended_views.sql
+   ```
 
-   Each notebook reads its `genie_config/roomN_curation.json`, rewrites table identifiers to the catalog/schema you set in the widgets, and `POST`s the room with `serialized_space` so it ships fully curated — no manual UI import. Re-running is a no-op unless you set `refresh_existing=yes`.
+8. **Add UC PK/FK constraints** -- Required for the Joins tab to auto-populate via FROM_SNIPPET:
+   ```sql
+   -- Run sql/06_uc_constraints.sql
+   ```
 
-7. **Validate** -- Open each room URL and ask a test question (e.g., "How many documents came in yesterday?" or "Which agents have the lowest compliance scores?").
+9. **Add column synonyms** -- Helps Genie disambiguate user terms like "FCR", "ASA", "payer":
+   ```sql
+   -- Run sql/07_uc_labels.sql
+   ```
+
+10. **Apply row filters to source tables** -- Now real, not aspirational. Cascades through every view, metric view, and Genie conversation:
+    ```sql
+    -- Run sql/08_apply_row_filter.sql
+    ```
+
+11. **Create Genie Rooms** -- Two options:
+
+    **From a workstation (CLI):**
+    ```bash
+    python genie_config/create_rooms.py
+    ```
+    Idempotent — preserves existing curation.
+
+    **From the workspace (notebooks, no DABs needed):**
+    - `notebooks/create_room1_doc_processing.py` — provisions Room 1 (11 tables / 8 sample SQLs / rich instructions including MEASURE() preference + CMS 2026 PA SLA glossary).
+    - `notebooks/create_room2_provider_support.py` — provisions Room 2 (6 tables / 8 sample SQLs / rich instructions for QA scoring + call operations).
+
+    Each notebook reads `genie_config/roomN_curation.json`, rewrites table identifiers to the catalog/schema you set in the widgets, and `POST`s the room with `serialized_space` so it ships fully curated — no manual UI import. Re-running is a no-op unless you set `refresh_existing=yes`.
+
+12. **POST canonical benchmarks** to the `/curated-questions` API (these don't render when sent inside `serialized_space.benchmarks`):
+    ```bash
+    python genie_config/sync_benchmarks.py
+    ```
+
+13. **Validate** -- Open each room URL and ask a test question. The full battery covers PA SLA compliance, payer mix, FCR/AHT/ASA, and the original document/call quality questions.
 
 ### Maintaining the rooms over time
 
@@ -148,31 +178,42 @@ A longer-form domain reference for both rooms (Fellegi-Sunter primer, channel de
 | 7 | `genie_call_sentiment` | `transcript_intel_sdp.gold_call_summaries_sentiment` | AI-generated call summaries with sentiment analysis (overall, start, end, trajectory) |
 | 8 | `genie_compliance_daily` | `transcript_intel_sdp.mv_compliance_outcomes` | Daily compliance rates with rolling trends, WoW comparison, agency rankings, and consecutive-day streaks |
 
+### Extended Views (PA + payer + call ops)
+
+| # | View | Source | Purpose |
+|---|------|--------|---------|
+| 9 | `genie_pa_decisions_daily` | `raw.authorization` | Per-day per-payer PA decision metrics with CMS-0057-F SLA compliance (72-hr urgent / 7-day standard) |
+| 10 | `genie_payer_mix` | `raw.clinical_document` + `raw.authorization` + `ref.payer_dim` | Per-payer snapshot: volume, PA decisions, approval rate |
+| 11 | `genie_call_ops_daily` | `mv_call_scores` + `call_ops_supplemental` | Per-day per-agency FCR, AHT, ASA, abandonment proxy |
+
 ### Metric Views (AI/BI)
 
 Pre-defined measures and dimensions for Genie aggregate queries:
 
 | # | Metric View | Source View | Key Measures |
 |---|-------------|-------------|--------------|
-| 9 | `mv_doc_intake_metrics` | `genie_doc_intake_daily` | total_documents, unreadable_rate_pct, channel volumes, spike_day_count |
-| 10 | `mv_doc_match_metrics` | `genie_doc_match_detail` | match_rate_pct, avg_match_weight, high_risk_pct, extraction_completeness_pct |
-| 11 | `mv_call_quality_metrics` | `genie_call_scores` | avg_call_score, compliance_rate_pct, high_risk_pct, escalation_rate_pct |
+| 12 | `mv_doc_intake_metrics` | `genie_doc_intake_daily` | total_documents, unreadable_rate_pct, channel volumes, spike_day_count |
+| 13 | `mv_doc_match_metrics` | `genie_doc_match_detail` | match_rate_pct, avg_match_weight, high_risk_pct, extraction_completeness_pct |
+| 14 | `mv_call_quality_metrics` | `genie_call_scores` | avg_call_score, compliance_rate_pct, high_risk_pct, escalation_rate_pct |
+| 15 | `mv_pa_metrics` | `genie_pa_decisions_daily` | pa_volume, approval_rate_pct, denial_rate_pct, sla_compliance_pct, avg_days_to_decision |
+| 16 | `mv_payer_mix_metrics` | `genie_payer_mix` | documents, pa_volume, pa_approval_rate_pct |
+| 17 | `mv_call_ops_metrics` | `genie_call_ops_daily` | total_calls, avg_wait_seconds (ASA), avg_handle_seconds (AHT), fcr_pct |
 
 ## Genie Rooms
 
 ### Room 1: Document Processing & Authorization Intelligence
 
-Audience: Ops leaders, utilization management staff, product managers.
+Audience: Ops leaders, utilization management staff, PA program owners, product managers, compliance officers.
 
-Covers document intake volume, OCR quality, Fellegi-Sunter match outcomes, authorization match trends, and pipeline KPIs. Five curated views with window functions for trend analysis, spike detection, and risk tiering.
+Covers document intake volume, OCR quality, Fellegi-Sunter match outcomes, authorization match trends, prior-authorization decisions and CMS 2026 SLA compliance, payer mix, and pipeline KPIs. Eleven curated views (including 4 metric views) with window functions for trend analysis, spike detection, and risk tiering.
 
 **URL**: `genie_config/create_rooms.py` (or the all-in-one notebook) prints the room URL on your workspace after provisioning. URLs follow the pattern `https://<your-workspace>.cloud.databricks.com/genie/rooms/<room_id>`.
 
 ### Room 2: Provider Support & Call Intelligence
 
-Audience: Call center supervisors, QA analysts, provider relations.
+Audience: Call center supervisors, QA analysts, provider relations, operations leads.
 
-Covers call quality scoring, agent performance rankings, AI-generated sentiment analysis, and compliance tracking with consecutive-day streak detection.
+Covers two distinct surfaces: (1) **call QA** — quality scoring, agent rankings, AI-generated sentiment, compliance streaks; (2) **call operations** — FCR (First Call Resolution), AHT (Average Handle Time), ASA (Average Speed to Answer), abandonment proxy. Six curated views (including 2 metric views).
 
 **URL**: same — printed by `create_rooms.py` / the notebook on your own workspace.
 
@@ -200,12 +241,18 @@ DROP SCHEMA <catalog>.genie_availity_ops CASCADE;
 │   └── genie_knowledge_store.md    # Domain reference (jargon, tiers, cross-room patterns)
 ├── sql/
 │   ├── 00_create_schemas.sql       # Schema DDL
-│   ├── 01_create_genie_views.sql   # 8 Genie views + 3 metric views
+│   ├── 01_create_genie_views.sql   # 8 base Genie views + 3 metric views
 │   ├── 02_source_table_comments.sql # Column comments on pipeline_prd tables
-│   └── 03_payer_access_filter.sql  # Multi-payer mapping table + row-filter function
+│   ├── 03_payer_access_filter.sql  # Multi-payer mapping table + row-filter function
+│   ├── 04_add_payer_pa_callops.sql # Extends schema with payer_dim, payer_code, urgency, call_ops_supplemental
+│   ├── 05_extended_views.sql       # Extended views: PA decisions, payer mix, call ops + 3 new metric views
+│   ├── 06_uc_constraints.sql       # UC primary/foreign keys for Joins tab auto-population
+│   ├── 07_uc_labels.sql            # Column synonyms (FCR, AHT, ASA, payer, urgency)
+│   └── 08_apply_row_filter.sql     # ALTER TABLE ... SET ROW FILTER — wires the multi-payer claim
 └── genie_config/
     ├── create_rooms.py             # Idempotent Genie Room provisioning (preserves curation)
     ├── export_rooms.py             # Pull live curation back to JSON (run after UI edits)
+    ├── sync_benchmarks.py          # POST benchmarks to /curated-questions (not serialized_space)
     ├── room1_curation.json         # Full curation export for Room 1 (source of truth)
     └── room2_curation.json         # Full curation export for Room 2 (source of truth)
 ```

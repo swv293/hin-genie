@@ -16,8 +16,9 @@
 # MAGIC    curation in a single API call — no manual UI import.
 # MAGIC
 # MAGIC **Prereqs**
-# MAGIC - `sql/00_create_schemas.sql`, `sql/01_create_genie_views.sql`, `sql/02_source_table_comments.sql`,
-# MAGIC   `sql/03_payer_access_filter.sql` already executed in the target catalog.
+# MAGIC - `sql/00_create_schemas.sql` through `sql/08_apply_row_filter.sql` executed in the target catalog
+# MAGIC   (schemas, base views, comments, row filter, payer/PA/call-ops extension, extended views, UC
+# MAGIC   PK/FK, column labels, applied filter).
 # MAGIC - The `genie_config/room2_curation.json` file from this repo is uploaded to the workspace at the path
 # MAGIC   given by the `curation_json_path` widget (defaults to a workspace-files path next to this notebook).
 # MAGIC - A SQL warehouse you can read from — its ID goes in the `warehouse_id` widget.

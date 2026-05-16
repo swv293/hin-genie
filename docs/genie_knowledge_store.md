@@ -78,6 +78,31 @@ This is why the **anchors** in the risk tier are DOB and SSN4 — losing either 
 | `is_volume_spike` | `total_docs > 2 × 7-day rolling avg` | Investigate intake spike — could be a payer-driven event or a provider system change |
 | `dq_degradation_flag` | `pct_unreadable > 1.5 × rolling avg` | Investigate OCR / channel quality — a sender's fax hardware may have failed |
 
+### Prior-authorization decisions and CMS 2026 SLA
+
+`raw.authorization` carries the PA-decision lifecycle: `auth_requested_date`, `auth_decision_date`, `status` (Approved / Denied / Partial / Pended / Pending / Cancelled / Expired), `urgency` (urgent / standard), `denial_reason_code`, `procedure_code`.
+
+`genie_pa_decisions_daily` aggregates these per (decision_date, payer_code, urgency) with **CMS-0057-F SLA flags**:
+
+- **Urgent**: 72-hour decision SLA. `within_sla_count` = decisions where `(auth_decision_date - auth_requested_date) × 24h ≤ 72h`.
+- **Standard**: 7-day (168-hour) decision SLA.
+
+Public reporting deadline: **March 31** each year, for the previous calendar year, per the CMS Interoperability and Prior Authorization Final Rule. Required metrics include approval rate, denial rate, and average time to decision — all surfaced as named measures on `mv_pa_metrics`:
+
+| Measure | What it returns |
+|---|---|
+| `pa_volume` | Total decisions in the slice |
+| `approval_rate_pct` | % Approved across non-cancelled decisions |
+| `denial_rate_pct` | % Denied across non-cancelled decisions |
+| `sla_compliance_pct` | % of decisions made within the CMS SLA |
+| `avg_days_to_decision` | Mean days from request to decision |
+
+### Payer dimension
+
+`ref.payer_dim` carries the five demo payers: **AETNA, UHC, BCBS, CIGNA, HUMANA**. The hash-based backfill in `sql/04_add_payer_pa_callops.sql` is deterministic — the same doc lands on the same payer every run.
+
+`payer_code` is propagated through `raw.clinical_document`, `raw.authorization`, and the four `pipeline_prd.*` tables. The row filter on those source tables cascades through every Genie view, metric view, and conversation. Adding a payer means inserting one row into `ref.payer_dim` and granting access via `payer_access_mapping`.
+
 ### Default conventions for Genie
 
 - "Match rate" without qualifier = **member match rate** (not auth match rate).
@@ -123,6 +148,33 @@ The HIN works with multiple outsourced agencies. Each agent belongs to one agenc
 - "Compliance rate" = `% of agent-days at or above the threshold`, calculated per the metric view definition.
 - Default time window = last 14 days.
 - "Top agents" = top-N by `call_score_pct` averaged over the requested window, with a minimum-volume filter (≥ 20 calls) to avoid skew.
+
+### Call operations vs. call QA — two distinct surfaces
+
+Room 2 carries two distinct surfaces over the same calls:
+
+| Surface | Tables | Answers questions like |
+|---|---|---|
+| **Call QA** (quality scoring) | `genie_call_scores`, `genie_call_sentiment`, `genie_compliance_daily`, `mv_call_quality_metrics` | "Top 10 agents by score", "compliance streak", "sentiment trajectory" |
+| **Call operations** (timings) | `genie_call_ops_daily`, `mv_call_ops_metrics` | "First Call Resolution rate", "AHT by agency", "ASA trend", "agencies missing the FCR benchmark" |
+
+Industry benchmarks (healthcare, 2026):
+
+| Metric | Target | Source |
+|---|---|---|
+| FCR (First Call Resolution) | ≥ 70% | Five9, CloudTalk |
+| AHT (Average Handle Time) | ≈ 12 min (720s) | Healthcare contact-center benchmarks |
+| ASA (Average Speed to Answer) | ≈ 4.4 min (264s) | Healthcare contact-center benchmarks |
+| Abandonment Rate | < 8% (alarm > 10%) | Industry standard |
+
+`mv_call_ops_metrics` exposes named measures:
+
+| Measure | What it returns |
+|---|---|
+| `total_calls` | Call volume |
+| `avg_wait_seconds` | ASA in seconds |
+| `avg_handle_seconds` | AHT in seconds |
+| `fcr_pct` | First Call Resolution percentage |
 
 ---
 

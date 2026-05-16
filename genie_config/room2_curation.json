@@ -8,51 +8,9 @@
     "config": {
       "sample_questions": [
         {
-          "id": "3779189fbf264a9c9b10f2b041bc093f",
-          "question": [
-            "Top-ranked agents by agency"
-          ]
-        },
-        {
-          "id": "4ab428b0ff29459ea830a4a3cfe73a42",
-          "question": [
-            "Call types with most negative sentiment"
-          ]
-        },
-        {
-          "id": "5db7bc15c73f4c0e91aa9f7ed76c66fb",
-          "question": [
-            "Which agents need coaching?"
-          ]
-        },
-        {
-          "id": "760a0af82d07448384913632097cf49a",
-          "question": [
-            "Sentiment distribution across all calls"
-          ]
-        },
-        {
           "id": "870ee68d51f741a2a40c33a852d74347",
           "question": [
             "Agents trending downward on rolling average"
-          ]
-        },
-        {
-          "id": "98b0c7096e6345739d09812a8f2948a3",
-          "question": [
-            "Top emotional markers in high-risk calls"
-          ]
-        },
-        {
-          "id": "9dd0213cc1f84745a42e882fe33be822",
-          "question": [
-            "Which agencies are below compliance threshold?"
-          ]
-        },
-        {
-          "id": "ae33d947a717499ca0f13c961b22f6d8",
-          "question": [
-            "Declining sentiment calls with complaints"
           ]
         },
         {
@@ -62,15 +20,90 @@
           ]
         },
         {
+          "id": "309c0e98ae60497c893cb4c16561d0af",
+          "question": [
+            "Average handle time by agency"
+          ]
+        },
+        {
+          "id": "831fcd5df78e400b9f6dc465ec21b4ff",
+          "question": [
+            "Average speed to answer trend last 30 days"
+          ]
+        },
+        {
+          "id": "4ab428b0ff29459ea830a4a3cfe73a42",
+          "question": [
+            "Call types with most negative sentiment"
+          ]
+        },
+        {
           "id": "eafa06bac63848d6ac3179d4e48fca51",
           "question": [
             "Compliance trend last 30 days"
+          ]
+        },
+        {
+          "id": "ae33d947a717499ca0f13c961b22f6d8",
+          "question": [
+            "Declining sentiment calls with complaints"
+          ]
+        },
+        {
+          "id": "4e97c63dbe9e4b26857c0196207b454e",
+          "question": [
+            "How does AHT vary by call type?"
+          ]
+        },
+        {
+          "id": "760a0af82d07448384913632097cf49a",
+          "question": [
+            "Sentiment distribution across all calls"
+          ]
+        },
+        {
+          "id": "98b0c7096e6345739d09812a8f2948a3",
+          "question": [
+            "Top emotional markers in high-risk calls"
+          ]
+        },
+        {
+          "id": "3779189fbf264a9c9b10f2b041bc093f",
+          "question": [
+            "Top-ranked agents by agency"
+          ]
+        },
+        {
+          "id": "bc1e1e8e7a704778939daba5e4a4bc88",
+          "question": [
+            "What is our First Call Resolution rate this week?"
+          ]
+        },
+        {
+          "id": "9dd0213cc1f84745a42e882fe33be822",
+          "question": [
+            "Which agencies are below compliance threshold?"
+          ]
+        },
+        {
+          "id": "6a86370ad672470a890622da2248c407",
+          "question": [
+            "Which agencies are missing FCR target?"
+          ]
+        },
+        {
+          "id": "5db7bc15c73f4c0e91aa9f7ed76c66fb",
+          "question": [
+            "Which agents need coaching?"
           ]
         }
       ]
     },
     "data_sources": {
       "tables": [
+        {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_ops_daily"
+        },
         {
           "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores"
         },
@@ -81,6 +114,9 @@
           "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily"
         },
         {
+          "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_call_ops_metrics"
+        },
+        {
           "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.mv_call_quality_metrics"
         }
       ]
@@ -88,30 +124,40 @@
     "instructions": {
       "text_instructions": [
         {
-          "id": "9031b346df61418cb39945349ab74991",
+          "id": "698868ca0a9748fb9cfa1f04820897dd",
           "content": [
             "## Who uses this room\n",
-            "Call center supervisors, QA analysts, and provider relations managers at a national health information network. When document processing fails or transactions stall, providers call. Understanding why, how well agents handle it, and where self-service could deflect volume is a direct lever on network value.\n",
+            "Call center supervisors, QA analysts, provider relations leads, and operations managers at a national health information network's provider support floor. Provider calls come into multiple outsourced agencies for prior authorizations, claims status, eligibility, benefit inquiries, or enrollment.\n",
             "\n",
-            "## Jargon\n",
-            "- call_score: 0-100. 35% ASR confidence + 35% section coverage + 20% redaction + 10% disposition.\n",
-            "- outcome_bucket: 'compliant' (>=85), 'needs_review' (70-84), 'high_risk' (<70).\n",
-            "- ASR: Automatic Speech Recognition. FCR: First Call Resolution. CSAT: Customer Satisfaction.\n",
-            "- Compliance rate: fraction of calls >= 85. Target: 0.85 (85%).\n",
-            "- days_below_threshold: consecutive calendar days compliance_rate < 0.85. Streak > 3 = systemic issue.\n",
-            "- Sentiment trajectory: stable, improving, declining, volatile. 'declining' = started fine, ended badly.\n",
-            "- Emotional markers: frustration, clarification_question, supervisor_request, code_switching (language switch), hold_used.\n",
+            "## Two distinct surfaces in this room\n",
+            "- **QA scoring** \u2014 genie_call_scores, genie_call_sentiment, genie_compliance_daily, mv_call_quality_metrics. Quality, sentiment, compliance streaks.\n",
+            "- **Call operations** \u2014 genie_call_ops_daily, mv_call_ops_metrics. Timings: FCR, AHT, ASA, queue, abandonment.\n",
+            "Pick the right surface for the question. QA scoring = how well the call went. Operations = how fast / efficiently.\n",
+            "\n",
+            "## Domain dictionary\n",
+            "- Call quality scoring rubric: 35% transcription confidence + 35% section coverage + 20% PII redaction compliance + 10% disposition quality. Score 0-100.\n",
+            "- score_band: Excellent (>=90) / Good (75-89) / Needs Coaching (60-74) / At Risk (<60).\n",
+            "- Compliance threshold: 0.85 (85%). Below-compliance day = compliance_rate < 0.85.\n",
+            "- FCR = First Call Resolution = resolved without a callback within 7 days. Healthcare benchmark: aim for >=70%.\n",
+            "- AHT = Average Handle Time (seconds). Healthcare benchmark: ~720s (12 min) target.\n",
+            "- ASA = Average Speed to Answer = wait_seconds. Healthcare benchmark: ~264s (4.4 min) target.\n",
+            "- Abandoned proxy: wait_seconds > 600 (10 min). Industry abandonment alarm threshold: > 8%.\n",
+            "- sentiment_trajectory: stable / improving / declining / volatile / stable_high / stable_low / declining_then_flat.\n",
+            "\n",
+            "## SOURCE PREFERENCE (critical for accuracy)\n",
+            "- For call quality aggregates (compliance rate, average score, high risk pct, escalation rate) \u2014 prefer MEASURE(<measure_name>) on mv_call_quality_metrics.\n",
+            "- For call operations aggregates (FCR pct, AHT, ASA, call volume) \u2014 prefer MEASURE(<measure_name>) on mv_call_ops_metrics.\n",
+            "- Do NOT recompute these from base views unless the user asks for row-level detail.\n",
+            "- MEASURE() aliases are NOT visible in HAVING. Always wrap MEASURE() in a CTE and filter / order in the outer SELECT.\n",
             "\n",
             "## Guardrails\n",
-            "- No caller PII. Agent names are pseudonymized.\n",
-            "- 'worst agents' \u2192 frame as 'agents who would benefit from coaching'. Use agent_rank_in_agency.\n",
-            "- Always pair sentiment_overall with sentiment_trajectory for full context.\n",
-            "- genie_call_sentiment.document_id = genie_call_scores.call_id for joining.\n",
-            "- Default date range: last 30 days.\n",
-            "- Window columns (agent_avg_score, agent_rolling_5_avg, rolling_7d_compliance) are pre-computed.\n",
+            "- Never expose actual call transcripts \u2014 only AI-generated summaries and quality scores are available.\n",
+            "- Compliance rate questions default to last 30 days; FCR / AHT / ASA default to last 14 days.\n",
+            "- 'Declining' sentiment trajectory with a normal score band is an early warning \u2014 flag it.\n",
+            "- For 'top agents' questions, require minimum call volume (>=20 calls) to avoid single-call outliers.\n",
             "\n",
             "## Beyond this room\n",
-            "Document processing pipeline and match quality: 'Clinical Document Processing Intelligence' room.\n"
+            "Document processing, OCR quality, Fellegi-Sunter match outcomes, PA decisions/SLAs, payer mix: 'Clinical Document Processing Intelligence' room.\n"
           ]
         }
       ],
@@ -138,6 +184,42 @@
           ],
           "usage_guidance": [
             "Use for compliance streak alerts or systemic agency issues"
+          ]
+        },
+        {
+          "id": "7fee759e480f44cb94157278d985d3f9",
+          "question": [
+            "Agencies below the 70% FCR healthcare benchmark"
+          ],
+          "sql": [
+            "WITH m AS (SELECT agency_name, MEASURE(fcr_pct) AS fcr FROM serverless_stable_swv01_catalog.genie_availity_ops.mv_call_ops_metrics GROUP BY agency_name) SELECT agency_name, fcr FROM m WHERE fcr < 70 ORDER BY fcr ASC"
+          ],
+          "usage_guidance": [
+            "Use this when the user asks about FCR misses, struggling agencies, or coaching priorities."
+          ]
+        },
+        {
+          "id": "88340d97202d4ae69d9ac290aa23e993",
+          "question": [
+            "AHT by call type trend last 14 days"
+          ],
+          "sql": [
+            "WITH m AS (SELECT ops_date, call_type, MEASURE(avg_handle_seconds) AS aht_sec FROM serverless_stable_swv01_catalog.genie_availity_ops.mv_call_ops_metrics WHERE ops_date >= CURRENT_DATE - INTERVAL 14 DAYS GROUP BY ops_date, call_type) SELECT * FROM m ORDER BY ops_date DESC, aht_sec DESC"
+          ],
+          "usage_guidance": [
+            "Use for call duration trends, AHT analysis, or handle-time-by-type questions."
+          ]
+        },
+        {
+          "id": "96f01f6cc1134ae885e9f00271a8608c",
+          "question": [
+            "FCR, AHT, ASA per agency using the metric view"
+          ],
+          "sql": [
+            "WITH m AS (SELECT agency_name, MEASURE(fcr_pct) AS fcr, MEASURE(avg_handle_seconds) AS aht_sec, MEASURE(avg_wait_seconds) AS asa_sec FROM serverless_stable_swv01_catalog.genie_availity_ops.mv_call_ops_metrics GROUP BY agency_name) SELECT * FROM m ORDER BY fcr DESC"
+          ],
+          "usage_guidance": [
+            "Use mv_call_ops_metrics MEASURE() for the governed FCR / AHT / ASA numbers. Always wrap in a CTE before ordering."
           ]
         },
         {
@@ -174,50 +256,6 @@
           ],
           "usage_guidance": [
             "Use for agency comparison, compliance leaderboard, or ranking questions"
-          ]
-        }
-      ],
-      "join_specs": [
-        {
-          "id": "a85184d08f264e9c845e8fadcdfebff3",
-          "left": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores",
-            "alias": "genie_call_scores"
-          },
-          "right": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily",
-            "alias": "genie_compliance_daily"
-          },
-          "sql": [
-            "`genie_call_scores`.`scored_date` = `genie_compliance_daily`.`day` AND `genie_call_scores`.`agency_name` = `genie_compliance_daily`.`agency_name` AND `genie_call_scores`.`call_type` = `genie_compliance_daily`.`call_type`",
-            "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
-          ],
-          "comment": [
-            "Many scored calls per daily compliance aggregate"
-          ],
-          "instruction": [
-            "Use when correlating individual call scores with daily compliance metrics for the same agency, call type, and day"
-          ]
-        },
-        {
-          "id": "df7315211af546a384986829445ac46d",
-          "left": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment",
-            "alias": "genie_call_sentiment"
-          },
-          "right": {
-            "identifier": "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores",
-            "alias": "genie_call_scores"
-          },
-          "sql": [
-            "`genie_call_sentiment`.`document_id` = `genie_call_scores`.`call_id`",
-            "--rt=FROM_RELATIONSHIP_TYPE_ONE_TO_ONE--"
-          ],
-          "comment": [
-            "One sentiment analysis per scored call"
-          ],
-          "instruction": [
-            "Use when combining call quality scores with AI-generated sentiment analysis"
           ]
         }
       ],
@@ -447,146 +485,6 @@
           }
         ]
       }
-    },
-    "benchmarks": {
-      "questions": [
-        {
-          "id": "f6cace700f01477d9dabc2aadc212ab9",
-          "question": [
-            "Which call type has the most escalations?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT call_type, COUNT(*) AS escalation_count\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n",
-                "WHERE disposition = 'escalated'\n",
-                "GROUP BY call_type\n",
-                "ORDER BY escalation_count DESC\n",
-                "LIMIT 1\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "f0cb7bab9ef3462782432852daefc43a",
-          "question": [
-            "Show me the top 5 agents by score in each agency"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT agent_name, agency_name, agent_avg_score, agent_rank_in_agency\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n",
-                "WHERE agent_rank_in_agency <= 5\n",
-                "GROUP BY agent_name, agency_name, agent_avg_score, agent_rank_in_agency\n",
-                "ORDER BY agency_name, agent_rank_in_agency\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "a3a4d7397d2f4ea48be8f6de990dce41",
-          "question": [
-            "What percentage of calls are high risk?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT ROUND(100.0 * SUM(CASE WHEN outcome_bucket = 'high_risk' THEN 1 ELSE 0 END) / COUNT(*), 2) AS high_risk_pct\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "98c3794539eb4e5ebded2e1b6cdf34a8",
-          "question": [
-            "How many calls have declining sentiment?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT COUNT(*) AS declining_calls\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment\n",
-                "WHERE sentiment_trajectory = 'declining'\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "7d93eeeca84049d89cacac6e1ce11baa",
-          "question": [
-            "What is the week-over-week compliance change by agency?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT agency_name, day, compliance_rate, prev_week_compliance, wow_compliance_change\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily\n",
-                "WHERE prev_week_compliance IS NOT NULL\n",
-                "ORDER BY day DESC, agency_name\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "7652abaeeb07474da555b6f1488cca90",
-          "question": [
-            "Which agency has the best compliance rate?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT agency_name, ROUND(AVG(compliance_rate), 4) AS avg_compliance\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily\n",
-                "GROUP BY agency_name\n",
-                "ORDER BY avg_compliance DESC\n",
-                "LIMIT 1\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "6b8ad90a88284b17b597cd02c34ea730",
-          "question": [
-            "What is the overall average call quality score?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT ROUND(AVG(call_score), 1) AS avg_score\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores\n"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "03d60b1f0636485191e75c6037b8ba15",
-          "question": [
-            "Are there agencies with compliance below 85% for more than 3 consecutive days?"
-          ],
-          "answer": [
-            {
-              "format": "SQL",
-              "content": [
-                "SELECT DISTINCT agency_name, call_type, MAX(days_below_threshold) AS max_streak\n",
-                "FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily\n",
-                "WHERE days_below_threshold > 3\n",
-                "GROUP BY agency_name, call_type\n",
-                "ORDER BY max_streak DESC\n"
-              ]
-            }
-          ]
-        }
-      ]
     }
   }
 }

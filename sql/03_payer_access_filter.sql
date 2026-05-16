@@ -24,14 +24,15 @@ CREATE TABLE IF NOT EXISTS serverless_stable_swv01_catalog.genie_availity_ops.pa
 )
 COMMENT 'Multi-payer access control list. One row per (user, payer) grant. Drives payer_access_filter().';
 
--- Seed a sentinel super-user grant for demo purposes.
--- Replace with real grants in production; or remove and rely on application-level provisioning.
+-- Seed a sentinel super-user grant for demo purposes — grants the demo
+-- owner access to every payer in ref.payer_dim. Replace with real grants
+-- in production, or remove and rely on application-level provisioning.
 INSERT INTO serverless_stable_swv01_catalog.genie_availity_ops.payer_access_mapping (user_email, payer_id, granted_at, granted_by)
-SELECT 'swami.venkatesh@databricks.com', payer_id, current_timestamp(), 'bootstrap'
-FROM (VALUES ('PAYER_A'), ('PAYER_B'), ('PAYER_C'), ('PAYER_D'), ('PAYER_E')) AS p(payer_id)
+SELECT 'swami.venkatesh@databricks.com', payer_code, current_timestamp(), 'bootstrap'
+FROM serverless_stable_swv01_catalog.ref.payer_dim
 WHERE NOT EXISTS (
   SELECT 1 FROM serverless_stable_swv01_catalog.genie_availity_ops.payer_access_mapping m
-  WHERE m.user_email = 'swami.venkatesh@databricks.com' AND m.payer_id = p.payer_id
+  WHERE m.user_email = 'swami.venkatesh@databricks.com' AND m.payer_id = ref.payer_dim.payer_code
 );
 
 -- ------------------------------------------------------------
