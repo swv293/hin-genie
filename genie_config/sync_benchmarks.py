@@ -6,7 +6,26 @@ question_type: BENCHMARK. Each canonical Q&A is followed by 2-3 alternate
 phrasings (same answer SQL, different user wording) — per Databricks
 guidance, this tests space robustness across realistic phrasings.
 
-Run after `04 → 09` SQL has been applied and rooms have been PATCHed.
+⚠️  CRITICAL ORDERING — RUN THIS LAST ⚠️
+========================================
+Every PATCH to /api/2.0/genie/spaces/{id} with serialized_space WIPES
+all BENCHMARK rows from /curated-questions. There is no documented way
+to preserve them across PATCH.
+
+Required workflow whenever you change the room:
+  1. Apply SQL migrations (sql/04 → sql/09)
+  2. PATCH serialized_space (notebooks/create_room*_*.py OR create_rooms.py)
+  3. RUN THIS SCRIPT LAST
+
+If you re-PATCH the room later for any reason, you MUST re-run this
+script. Observed in this repo on 2026-05-17: a single mid-day PATCH
+wiped 14 BENCHMARKs from Room 1, leaving the Benchmarks tab empty.
+
+Why this happens (Databricks-side): the BENCHMARK type is stored
+alongside SAMPLE_QUESTIONs, which serialized_space owns. A PATCH
+appears to rewrite the curated-questions collection from
+serialized_space.config.sample_questions, dropping anything not in
+that list — BENCHMARK rows included.
 
 Usage:
   python genie_config/sync_benchmarks.py

@@ -246,7 +246,18 @@ print(f"Try a question: 'How many documents came in yesterday?' or 'Show me the 
 # MAGIC ## Done
 # MAGIC
 # MAGIC - The room is fully provisioned with tables, sample questions, instructions, sample SQL queries,
-# MAGIC   joins, filter / expression / measure snippets, and benchmark questions.
+# MAGIC   joins, filter / expression / measure snippets.
 # MAGIC - Re-running this notebook is a no-op unless `refresh_existing` is set to `yes`.
-# MAGIC - To capture future UI edits back into the JSON, run `genie_config/export_rooms.py` from a workstation
-# MAGIC   that has the Databricks CLI configured.
+# MAGIC
+# MAGIC ## ⚠️ NEXT STEP — RE-RUN sync_benchmarks.py
+# MAGIC
+# MAGIC PATCHing `serialized_space` (which this notebook does) **wipes BENCHMARK rows** from
+# MAGIC `/api/2.0/data-rooms/{id}/curated-questions`. The Benchmarks tab in the Genie UI will be
+# MAGIC empty until you re-post them.
+# MAGIC
+# MAGIC From a workstation with the Databricks CLI configured:
+# MAGIC ```bash
+# MAGIC python genie_config/sync_benchmarks.py
+# MAGIC ```
+# MAGIC
+# MAGIC To capture future UI edits back into the JSON, run `genie_config/export_rooms.py`.
