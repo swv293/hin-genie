@@ -30,7 +30,7 @@ flowchart LR
         EVENTS[match_events]
     end
 
-    subgraph genie_availity_ops
+    subgraph genie_ops
         V1[genie_doc_intake_daily]
         V2[genie_doc_match_detail]
         V3[genie_auth_match_daily]
