@@ -124,40 +124,34 @@
     "instructions": {
       "text_instructions": [
         {
-          "id": "698868ca0a9748fb9cfa1f04820897dd",
+          "id": "31e5b7d9fc1f4d20b20fd88bd2cac176",
           "content": [
             "## Who uses this room\n",
-            "Call center supervisors, QA analysts, provider relations leads, and operations managers at a national health information network's provider support floor. Provider calls come into multiple outsourced agencies for prior authorizations, claims status, eligibility, benefit inquiries, or enrollment.\n",
+            "Call center supervisors, QA analysts, provider relations leads, and operations managers at a national HIN's provider support floor. Provider calls come into multiple outsourced agencies for prior authorizations, claims status, eligibility, benefit inquiries, or enrollment.\n",
             "\n",
-            "## Two distinct surfaces in this room\n",
+            "## Two distinct surfaces\n",
             "- **QA scoring** \u2014 genie_call_scores, genie_call_sentiment, genie_compliance_daily, mv_call_quality_metrics. Quality, sentiment, compliance streaks.\n",
             "- **Call operations** \u2014 genie_call_ops_daily, mv_call_ops_metrics. Timings: FCR, AHT, ASA, queue, abandonment.\n",
-            "Pick the right surface for the question. QA scoring = how well the call went. Operations = how fast / efficiently.\n",
+            "Use the QA surface for 'how well', the ops surface for 'how fast / efficiently'.\n",
             "\n",
-            "## Domain dictionary\n",
-            "- Call quality scoring rubric: 35% transcription confidence + 35% section coverage + 20% PII redaction compliance + 10% disposition quality. Score 0-100.\n",
-            "- score_band: Excellent (>=90) / Good (75-89) / Needs Coaching (60-74) / At Risk (<60).\n",
-            "- Compliance threshold: 0.85 (85%). Below-compliance day = compliance_rate < 0.85.\n",
-            "- FCR = First Call Resolution = resolved without a callback within 7 days. Healthcare benchmark: aim for >=70%.\n",
-            "- AHT = Average Handle Time (seconds). Healthcare benchmark: ~720s (12 min) target.\n",
-            "- ASA = Average Speed to Answer = wait_seconds. Healthcare benchmark: ~264s (4.4 min) target.\n",
-            "- Abandoned proxy: wait_seconds > 600 (10 min). Industry abandonment alarm threshold: > 8%.\n",
-            "- sentiment_trajectory: stable / improving / declining / volatile / stable_high / stable_low / declining_then_flat.\n",
+            "## How they want answers\n",
+            "- Supervisors want agent / agency rankings with call counts so they know which to trust. Always include n_calls.\n",
+            "- QA analysts want compliance streaks and trend direction. Quote WoW deltas where available.\n",
+            "- Provider relations / ops managers want FCR, AHT, ASA against healthcare benchmarks: FCR \u2265 70%, AHT ~720s, ASA ~264s. Call out whether the agency is over or under benchmark.\n",
+            "- Default shape: one sentence summary + a small table (\u2264 10 rows) + one sentence on what stands out.\n",
+            "- For 'top agents' / 'best agents' requests, gate by minimum call volume (\u2265 20) to avoid single-call outliers.\n",
+            "- Empty result sets must be acknowledged explicitly with the filter used.\n",
             "\n",
-            "## SOURCE PREFERENCE (critical for accuracy)\n",
-            "- For call quality aggregates (compliance rate, average score, high risk pct, escalation rate) \u2014 prefer MEASURE(<measure_name>) on mv_call_quality_metrics.\n",
-            "- For call operations aggregates (FCR pct, AHT, ASA, call volume) \u2014 prefer MEASURE(<measure_name>) on mv_call_ops_metrics.\n",
-            "- Do NOT recompute these from base views unless the user asks for row-level detail.\n",
-            "- MEASURE() aliases are NOT visible in HAVING. Always wrap MEASURE() in a CTE and filter / order in the outer SELECT.\n",
+            "## SOURCE PREFERENCE\n",
+            "For quality aggregates (compliance rate, average score, escalation rate) prefer MEASURE() on mv_call_quality_metrics. For ops aggregates (FCR pct, AHT, ASA, call volume) prefer MEASURE() on mv_call_ops_metrics. Do NOT recompute from base views unless asked for row-level detail. MEASURE() aliases are NOT visible in HAVING \u2014 wrap MEASURE() in a CTE.\n",
             "\n",
             "## Guardrails\n",
-            "- Never expose actual call transcripts \u2014 only AI-generated summaries and quality scores are available.\n",
-            "- Compliance rate questions default to last 30 days; FCR / AHT / ASA default to last 14 days.\n",
+            "- Never expose actual call transcripts \u2014 only AI-generated summaries.\n",
+            "- Compliance defaults: last 30 days. FCR / AHT / ASA defaults: last 14 days.\n",
             "- 'Declining' sentiment trajectory with a normal score band is an early warning \u2014 flag it.\n",
-            "- For 'top agents' questions, require minimum call volume (>=20 calls) to avoid single-call outliers.\n",
             "\n",
             "## Beyond this room\n",
-            "Document processing, OCR quality, Fellegi-Sunter match outcomes, PA decisions/SLAs, payer mix: 'Clinical Document Processing Intelligence' room.\n"
+            "Document processing, OCR quality, match outcomes, PA decisions / SLAs, payer mix: 'Clinical Document Processing Intelligence' room.\n"
           ]
         }
       ],
@@ -262,6 +256,38 @@
       "sql_snippets": {
         "filters": [
           {
+            "id": "13a4eb1251eb4f82979008c2262f9e65",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`outcome_bucket` = 'compliant'"
+            ],
+            "display_name": "Compliant Calls",
+            "instruction": [
+              "Use for compliant / passing-quality call questions."
+            ],
+            "synonyms": [
+              "compliant",
+              "compliant calls",
+              "pass",
+              "high score"
+            ]
+          },
+          {
+            "id": "1ff1d2f713fa46c5b27a97ed29481353",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment.`sentiment_trajectory` = 'declining'"
+            ],
+            "display_name": "Declining Sentiment Trajectory",
+            "instruction": [
+              "Use for calls where sentiment got worse during the call \u2014 early warning signal."
+            ],
+            "synonyms": [
+              "declining sentiment",
+              "negative arc",
+              "got worse",
+              "sentiment dropped"
+            ]
+          },
+          {
             "id": "271f5d9fe5484921ba2cf02e30d2b1f3",
             "sql": [
               "serverless_stable_swv01_catalog.genie_availity_ops.genie_compliance_daily.`days_below_threshold` > 3"
@@ -275,6 +301,37 @@
               "persistent",
               "chronic",
               "ongoing compliance issue"
+            ]
+          },
+          {
+            "id": "5ac9ec1702f741e7bcb6425f342083ac",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_ops_daily.`ops_date` >= CURRENT_DATE - INTERVAL 14 DAYS"
+            ],
+            "display_name": "Last 14 Days of Call Ops",
+            "instruction": [
+              "Apply when user asks about recent FCR / AHT / ASA without naming a window."
+            ],
+            "synonyms": [
+              "last 14 days",
+              "recent",
+              "past two weeks"
+            ]
+          },
+          {
+            "id": "5fcb423ff2b84982870e7b73cce994d8",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`outcome_bucket` = 'high_risk'"
+            ],
+            "display_name": "High Risk Calls",
+            "instruction": [
+              "Use for high-risk / failing-quality call questions."
+            ],
+            "synonyms": [
+              "high risk call",
+              "failing call",
+              "below threshold",
+              "at risk"
             ]
           },
           {
@@ -293,6 +350,22 @@
             ]
           },
           {
+            "id": "72bea042b6a5403c9ff56debfb7f68af",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`agent_call_count` >= 20"
+            ],
+            "display_name": "Statistically Significant Agent Volume",
+            "instruction": [
+              "Use whenever ranking agents \u2014 minimum 20 calls to avoid single-call outliers."
+            ],
+            "synonyms": [
+              "min volume",
+              "significant volume",
+              "at least 20 calls",
+              "statistically valid"
+            ]
+          },
+          {
             "id": "a3aeca3ade744cab9e1c3c6880a98abc",
             "sql": [
               "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`disposition` = 'escalated'"
@@ -306,6 +379,22 @@
               "escalation",
               "supervisor",
               "transferred"
+            ]
+          },
+          {
+            "id": "c7633a005b694115b29cb1b07c72bbb5",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores.`disposition` = 'escalated'"
+            ],
+            "display_name": "Escalated Calls",
+            "instruction": [
+              "Use for escalation / complaint-routed call questions."
+            ],
+            "synonyms": [
+              "escalated",
+              "escalation",
+              "complaint",
+              "supervisor request"
             ]
           },
           {

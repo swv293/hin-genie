@@ -139,37 +139,30 @@
     "instructions": {
       "text_instructions": [
         {
-          "id": "93494cc850ec462db2afad659a17cea0",
+          "id": "ec078db4f9274895bf6a473336b74181",
           "content": [
             "## Who uses this room\n",
-            "Operations leaders, utilization management analysts, PA program owners, and product managers at a national health information network. Core challenge: clinical documents arrive from thousands of provider sources via four intake channels (fax, electronic, upload, mail) and must be OCR-parsed, identity-matched to members and authorizations using Fellegi-Sunter scoring, and routed to the correct payer workflow under SLA.\n",
+            "Operations leaders, utilization management analysts, PA program owners, compliance officers, and product managers at a national health information network. Core challenge: clinical documents arrive from thousands of provider sources via four intake channels and must be OCR-parsed, identity-matched to members and authorizations using Fellegi-Sunter scoring, and routed to the correct payer workflow under SLA.\n",
             "\n",
-            "## Domain dictionary\n",
-            "- Fellegi-Sunter: probabilistic record linkage. Higher total_weight = stronger match.\n",
-            "- match_class: 'match' (high confidence), 'possible_match' (human review), 'non_match'.\n",
-            "- doc_risk_tier: 'Unreadable' / 'High Risk - No Anchors' (DOB+SSN4 missing) / 'Medium Risk - One Anchor' / 'Low Risk - Both Anchors'.\n",
-            "- Prior auth (PA): payer approval before a medical service.\n",
-            "- urgency: 'urgent' = 72-hour CMS SLA, 'standard' = 7-day CMS SLA (CMS-0057-F, effective 2026).\n",
-            "- payer_code: one of NORTHWAVE, METRIDIAN, BLUEHARBOR, VERITAS, SILVERPEAK (fictional demo payers). Each user only sees their authorized payers via Unity Catalog row filters.\n",
-            "- NPI: National Provider Identifier (10 digits). OCR: Optical Character Recognition.\n",
-            "- Intake channel: fax, electronic (EDI), upload, mail.\n",
+            "## How they want answers\n",
+            "- Lead with the headline number, then the breakdown that explains it. Round percentages to 2 decimals.\n",
+            "- For approval / SLA / compliance questions, quote the percentage AND the absolute counts so the reader can sanity-check.\n",
+            "- For PA SLA questions, name the CMS 2026 threshold the answer is being measured against (72 hours urgent, 7 days standard).\n",
+            "- For trend questions, prefer the pre-computed window column (rolling_7d_avg, rolling_30d_avg, is_volume_spike, dq_degradation_flag) and call out the most recent inflection if any.\n",
+            "- Default shape: one sentence summary + a small table (\u2264 10 rows) + one sentence on what stands out.\n",
+            "- If the answer set is empty, say so explicitly with the filter used. Never return a silent zero.\n",
             "\n",
-            "## SOURCE PREFERENCE (critical for accuracy)\n",
-            "- For aggregates like approval rate, SLA compliance, match rate, unreadable rate \u2014 prefer MEASURE(<measure_name>) against the appropriate metric view (mv_pa_metrics, mv_doc_match_metrics, mv_doc_intake_metrics, mv_payer_mix_metrics).\n",
-            "- The metric view encapsulates the canonical business definition. Do NOT recompute the aggregation from base views unless the user asks for row-level detail.\n",
-            "- MEASURE() aliases are NOT visible in HAVING. Always wrap MEASURE() in a CTE and filter / order in the outer SELECT.\n",
+            "## SOURCE PREFERENCE\n",
+            "For aggregates (approval rate, SLA compliance, match rate, unreadable rate, payer mix) prefer MEASURE(<measure_name>) against the relevant metric view: mv_pa_metrics, mv_doc_match_metrics, mv_doc_intake_metrics, mv_payer_mix_metrics. The metric view encapsulates the canonical business definition. Do NOT recompute the aggregation from base views unless the user asks for row-level detail. MEASURE() aliases are NOT visible in HAVING \u2014 wrap MEASURE() in a CTE and filter / order in the outer SELECT.\n",
             "\n",
             "## Guardrails\n",
             "- Never expose or guess member names, SSNs, DOB, or any PHI.\n",
             "- 'Match rate' = member match rate unless specified.\n",
             "- Default date range: last 30 days unless the user specifies.\n",
-            "- is_volume_spike = total_docs > 2x 7-day rolling avg. dq_degradation_flag = pct_unreadable > 1.5x rolling avg.\n",
             "- genie_pipeline_snapshot has no date dimension \u2014 never use for trends.\n",
-            "- Window columns are pre-computed. Use directly.\n",
-            "- The CMS 2026 prior-authorization rule (CMS-0057-F) requires 72-hr urgent / 7-day standard turnaround. Use mv_pa_metrics.sla_compliance_pct for compliance reporting questions.\n",
             "\n",
             "## Beyond this room\n",
-            "Call center quality, compliance, sentiment, and call operations (FCR, AHT, ASA): 'Provider Support & Call Intelligence' room.\n"
+            "Call quality, sentiment, compliance streaks, and call operations (FCR, AHT, ASA): 'Provider Support & Call Intelligence' room.\n"
           ]
         }
       ],
@@ -184,18 +177,6 @@
           ],
           "usage_guidance": [
             "Use this when the user asks about CMS 2026 PA reporting, 72-hour SLA, or urgent decisions."
-          ]
-        },
-        {
-          "id": "353e3faf1c504004a6f5ff8436a11c7b",
-          "question": [
-            "Match rate by document type"
-          ],
-          "sql": [
-            "SELECT document_type, COUNT(*) AS total_docs, ROUND(100.0 * SUM(CASE WHEN match_class = 'match' THEN 1 ELSE 0 END) / COUNT(*), 2) AS match_rate_pct FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail GROUP BY document_type ORDER BY match_rate_pct"
-          ],
-          "usage_guidance": [
-            "Use for match rate comparisons across document types"
           ]
         },
         {
@@ -257,22 +238,27 @@
           "usage_guidance": [
             "Use for auth match WoW comparison or authorization trend analysis"
           ]
-        },
-        {
-          "id": "efde15db1de24d4eb97400814303eec6",
-          "question": [
-            "Document risk tier breakdown"
-          ],
-          "sql": [
-            "SELECT doc_risk_tier, COUNT(*) AS doc_count, ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail GROUP BY doc_risk_tier ORDER BY doc_count DESC"
-          ],
-          "usage_guidance": [
-            "Use for risk distribution, risk summary, or risk tier questions"
-          ]
         }
       ],
       "sql_snippets": {
         "filters": [
+          {
+            "id": "16b85ef350a649018b57855c74b3e8f9",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_pa_decisions_daily.`urgency` = 'urgent'"
+            ],
+            "display_name": "Urgent PA Decisions",
+            "instruction": [
+              "Use for urgent PA / 72-hour SLA questions."
+            ],
+            "synonyms": [
+              "urgent",
+              "expedited",
+              "72-hour",
+              "72 hr",
+              "urgent prior auth"
+            ]
+          },
           {
             "id": "17dc2a46498d4db7a96c5e7c8b80ff12",
             "sql": [
@@ -286,6 +272,70 @@
               "degradation",
               "quality drop",
               "OCR degrading"
+            ]
+          },
+          {
+            "id": "190411938b3c4b31a311b53eccae5c7a",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_pa_decisions_daily.`decision_date` >= CURRENT_DATE - INTERVAL 30 DAYS"
+            ],
+            "display_name": "Last 30 Days of PA Decisions",
+            "instruction": [
+              "Apply when user asks about recent PA decision activity without naming a window."
+            ],
+            "synonyms": [
+              "last 30 days",
+              "recent",
+              "past month",
+              "recent decisions"
+            ]
+          },
+          {
+            "id": "1b750a984c16455e89de407d73e72e5d",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_match_detail.`match_class` = 'match'"
+            ],
+            "display_name": "High Confidence Matches",
+            "instruction": [
+              "Use for high-confidence / accepted matches questions."
+            ],
+            "synonyms": [
+              "high confidence match",
+              "accepted match",
+              "match=match",
+              "confident match"
+            ]
+          },
+          {
+            "id": "5355245484b8465db1c5777e77905f1c",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_pa_decisions_daily.`urgency` = 'standard'"
+            ],
+            "display_name": "Standard PA Decisions",
+            "instruction": [
+              "Use for standard PA / 7-day SLA questions."
+            ],
+            "synonyms": [
+              "standard",
+              "7-day",
+              "7 day",
+              "routine prior auth"
+            ]
+          },
+          {
+            "id": "69b25701f99947dd84a7d265feec3edf",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_doc_intake_daily.`intake_date` >= CURRENT_DATE - INTERVAL 7 DAYS"
+            ],
+            "display_name": "Last 7 Days of Intake",
+            "instruction": [
+              "Apply when user asks about this week or recent intake without naming a window."
+            ],
+            "synonyms": [
+              "this week",
+              "last week",
+              "last 7 days",
+              "past 7 days"
             ]
           },
           {
@@ -348,6 +398,21 @@
               "unmatched",
               "failed match",
               "no match"
+            ]
+          },
+          {
+            "id": "f31ac978db4641abb252de4688b3c4b0",
+            "sql": [
+              "serverless_stable_swv01_catalog.genie_availity_ops.genie_payer_mix.`payer_type` = 'commercial'"
+            ],
+            "display_name": "Commercial Payers Only",
+            "instruction": [
+              "Use when user filters to commercial line of business."
+            ],
+            "synonyms": [
+              "commercial",
+              "LOB commercial",
+              "commercial payers"
             ]
           }
         ],
