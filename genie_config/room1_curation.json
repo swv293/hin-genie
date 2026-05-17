@@ -8,9 +8,9 @@
     "config": {
       "sample_questions": [
         {
-          "id": "44393831fa4c4550a2af4f207f646385",
+          "id": "1ee6e746b98e4e7ebeff9fda7bfe3b84",
           "question": [
-            "Are we hitting the CMS 72-hour urgent PA SLA?"
+            "Document risk tier breakdown"
           ]
         },
         {
@@ -20,15 +20,57 @@
           ]
         },
         {
-          "id": "1ee6e746b98e4e7ebeff9fda7bfe3b84",
+          "id": "3040a629aa3c4283bbcc3a0632aae2ee",
           "question": [
-            "Document risk tier breakdown"
+            "What is our PA SLA compliance rate by urgency?"
+          ]
+        },
+        {
+          "id": "32cc4ca36c9847b5926a0a8c8c34a677",
+          "question": [
+            "Show me payer mix by document volume"
+          ]
+        },
+        {
+          "id": "3c0fa553d4714985a7bf53991940c8ae",
+          "question": [
+            "Which document types have the worst match rate?"
+          ]
+        },
+        {
+          "id": "3ffe7b52686e496187e898c1fe851416",
+          "question": [
+            "What is our overall document match rate?"
+          ]
+        },
+        {
+          "id": "44393831fa4c4550a2af4f207f646385",
+          "question": [
+            "Are we hitting the CMS 72-hour urgent PA SLA?"
+          ]
+        },
+        {
+          "id": "4e6a6c3b1df745fba634d03618a8d298",
+          "question": [
+            "Were there any volume spikes this week?"
+          ]
+        },
+        {
+          "id": "6cb2ed2c7bca4407a1fcdef5e4136676",
+          "question": [
+            "Is our data quality degrading?"
           ]
         },
         {
           "id": "973b46f5347b49c198c1f4b58a20829f",
           "question": [
             "Documents missing both DOB and SSN4"
+          ]
+        },
+        {
+          "id": "998500a631cb4aada2de1a8cf7159ca5",
+          "question": [
+            "Which payer has the lowest approval rate?"
           ]
         },
         {
@@ -44,57 +86,15 @@
           ]
         },
         {
-          "id": "fdb202deb56a4e8cb10dc7ea216396d2",
-          "question": [
-            "How many documents came in yesterday?"
-          ]
-        },
-        {
-          "id": "6cb2ed2c7bca4407a1fcdef5e4136676",
-          "question": [
-            "Is our data quality degrading?"
-          ]
-        },
-        {
-          "id": "32cc4ca36c9847b5926a0a8c8c34a677",
-          "question": [
-            "Show me payer mix by document volume"
-          ]
-        },
-        {
           "id": "f096e9e3f1f64b18a1a153f5a57ee860",
           "question": [
             "Show me the current pipeline KPIs"
           ]
         },
         {
-          "id": "4e6a6c3b1df745fba634d03618a8d298",
+          "id": "fdb202deb56a4e8cb10dc7ea216396d2",
           "question": [
-            "Were there any volume spikes this week?"
-          ]
-        },
-        {
-          "id": "3040a629aa3c4283bbcc3a0632aae2ee",
-          "question": [
-            "What is our PA SLA compliance rate by urgency?"
-          ]
-        },
-        {
-          "id": "3ffe7b52686e496187e898c1fe851416",
-          "question": [
-            "What is our overall document match rate?"
-          ]
-        },
-        {
-          "id": "3c0fa553d4714985a7bf53991940c8ae",
-          "question": [
-            "Which document types have the worst match rate?"
-          ]
-        },
-        {
-          "id": "998500a631cb4aada2de1a8cf7159ca5",
-          "question": [
-            "Which payer has the lowest approval rate?"
+            "How many documents came in yesterday?"
           ]
         }
       ]
@@ -150,7 +150,7 @@
             "- doc_risk_tier: 'Unreadable' / 'High Risk - No Anchors' (DOB+SSN4 missing) / 'Medium Risk - One Anchor' / 'Low Risk - Both Anchors'.\n",
             "- Prior auth (PA): payer approval before a medical service.\n",
             "- urgency: 'urgent' = 72-hour CMS SLA, 'standard' = 7-day CMS SLA (CMS-0057-F, effective 2026).\n",
-            "- payer_code: one of AETNA, UHC, BCBS, CIGNA, HUMANA. Each user only sees their authorized payers via Unity Catalog row filters.\n",
+            "- payer_code: one of NORTHWAVE, METRIDIAN, BLUEHARBOR, VERITAS, SILVERPEAK (fictional demo payers). Each user only sees their authorized payers via Unity Catalog row filters.\n",
             "- NPI: National Provider Identifier (10 digits). OCR: Optical Character Recognition.\n",
             "- Intake channel: fax, electronic (EDI), upload, mail.\n",
             "\n",

@@ -20,26 +20,26 @@
 -- ============================================================
 
 -- ------------------------------------------------------------
--- 1. Payer dimension
+-- 1. Payer dimension — fictional payers only, no real-world company names
 -- ------------------------------------------------------------
 CREATE SCHEMA IF NOT EXISTS serverless_stable_swv01_catalog.ref;
 
 CREATE TABLE IF NOT EXISTS serverless_stable_swv01_catalog.ref.payer_dim (
-  payer_code  STRING NOT NULL COMMENT 'Short payer identifier — e.g., AETNA, UHC, BCBS, CIGNA, HUMANA',
+  payer_code  STRING NOT NULL COMMENT 'Short payer identifier — e.g., NORTHWAVE, METRIDIAN, BLUEHARBOR, VERITAS, SILVERPEAK',
   payer_name  STRING NOT NULL COMMENT 'Marketing name for the payer',
   payer_type  STRING          COMMENT 'commercial / medicare_advantage / medicaid / medigap',
   active      BOOLEAN         COMMENT 'Whether the payer is currently in the network',
   created_at  TIMESTAMP       COMMENT 'When this payer was added to the dimension'
 )
-COMMENT 'Payer dimension. Five demo payers seeded — extend by inserting more rows.';
+COMMENT 'Payer dimension. Five fictional demo payers seeded — extend by inserting more rows.';
 
 INSERT INTO serverless_stable_swv01_catalog.ref.payer_dim (payer_code, payer_name, payer_type, active, created_at)
 SELECT p.* FROM (VALUES
-  ('AETNA',  'Aetna',                          'commercial',         true, current_timestamp()),
-  ('UHC',    'UnitedHealthcare',               'commercial',         true, current_timestamp()),
-  ('BCBS',   'BlueCross BlueShield',           'commercial',         true, current_timestamp()),
-  ('CIGNA',  'Cigna',                          'commercial',         true, current_timestamp()),
-  ('HUMANA', 'Humana Medicare Advantage',      'medicare_advantage', true, current_timestamp())
+  ('NORTHWAVE',  'Northwave Health',         'commercial',         true, current_timestamp()),
+  ('METRIDIAN',  'Metridian',                'commercial',         true, current_timestamp()),
+  ('BLUEHARBOR', 'BlueHarbor',               'commercial',         true, current_timestamp()),
+  ('VERITAS',    'Veritas',                  'commercial',         true, current_timestamp()),
+  ('SILVERPEAK', 'SilverPeak Senior Health', 'medicare_advantage', true, current_timestamp())
 ) p(payer_code, payer_name, payer_type, active, created_at)
 WHERE NOT EXISTS (
   SELECT 1 FROM serverless_stable_swv01_catalog.ref.payer_dim d WHERE d.payer_code = p.payer_code
@@ -61,11 +61,11 @@ ALTER TABLE serverless_stable_swv01_catalog.pipeline_prd.doc_auth_match_candidat
 -- ------------------------------------------------------------
 -- Hash doc_id into a five-element bucket and map to payer_code.
 UPDATE serverless_stable_swv01_catalog.raw.clinical_document
-SET payer_code = element_at(array('AETNA','UHC','BCBS','CIGNA','HUMANA'), (abs(hash(doc_id)) % 5) + 1)
+SET payer_code = element_at(array('NORTHWAVE','METRIDIAN','BLUEHARBOR','VERITAS','SILVERPEAK'), (abs(hash(doc_id)) % 5) + 1)
 WHERE payer_code IS NULL;
 
 UPDATE serverless_stable_swv01_catalog.raw.authorization
-SET payer_code = element_at(array('AETNA','UHC','BCBS','CIGNA','HUMANA'), (abs(hash(auth_id)) % 5) + 1)
+SET payer_code = element_at(array('NORTHWAVE','METRIDIAN','BLUEHARBOR','VERITAS','SILVERPEAK'), (abs(hash(auth_id)) % 5) + 1)
 WHERE payer_code IS NULL;
 
 -- Roughly 30% urgent / 70% standard — matches industry mix for PA volume.

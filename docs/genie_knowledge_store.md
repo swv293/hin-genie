@@ -99,7 +99,7 @@ Public reporting deadline: **March 31** each year, for the previous calendar yea
 
 ### Payer dimension
 
-`ref.payer_dim` carries the five demo payers: **AETNA, UHC, BCBS, CIGNA, HUMANA**. The hash-based backfill in `sql/04_add_payer_pa_callops.sql` is deterministic — the same doc lands on the same payer every run.
+`ref.payer_dim` carries the five **fictional** demo payers: **NORTHWAVE** (Northwave Health, commercial), **METRIDIAN** (commercial), **BLUEHARBOR** (commercial), **VERITAS** (commercial), **SILVERPEAK** (SilverPeak Senior Health, medicare_advantage). All synthetic — no real-world company names. The hash-based backfill in `sql/04_add_payer_pa_callops.sql` is deterministic — the same doc lands on the same payer every run.
 
 `payer_code` is propagated through `raw.clinical_document`, `raw.authorization`, and the four `pipeline_prd.*` tables. The row filter on those source tables cascades through every Genie view, metric view, and conversation. Adding a payer means inserting one row into `ref.payer_dim` and granting access via `payer_access_mapping`.
 
