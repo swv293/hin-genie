@@ -132,7 +132,12 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
     -- Run sql/08_apply_row_filter.sql
     ```
 
-11. **Create Genie Rooms** -- Two options:
+11. **Spread timestamps over the last 90 days** -- Idempotent. The generator writes everything at one timestamp; this script spreads `ingestion_timestamp` / `auth_decision_date` / call ops over realistic windows so "last 7 days" / "this month" / 30-day trend questions return meaningful data:
+    ```sql
+    -- Run sql/09_spread_timestamps.sql
+    ```
+
+12. **Create Genie Rooms** -- Two options:
 
     **From a workstation (CLI):**
     ```bash
@@ -146,12 +151,12 @@ Import `notebooks/setup_genie_rooms.py` into your Databricks workspace and run a
 
     Each notebook reads `genie_config/roomN_curation.json`, rewrites table identifiers to the catalog/schema you set in the widgets, and `POST`s the room with `serialized_space` so it ships fully curated — no manual UI import. Re-running is a no-op unless you set `refresh_existing=yes`.
 
-12. **POST canonical benchmarks** to the `/curated-questions` API (these don't render when sent inside `serialized_space.benchmarks`):
+13. **POST canonical benchmarks** to the `/curated-questions` API (these don't render when sent inside `serialized_space.benchmarks`):
     ```bash
     python genie_config/sync_benchmarks.py
     ```
 
-13. **Validate** -- Open each room URL and ask a test question. The full battery covers PA SLA compliance, payer mix, FCR/AHT/ASA, and the original document/call quality questions.
+14. **Validate** -- Open each room URL and ask a test question. The full battery covers PA SLA compliance, payer mix, FCR/AHT/ASA, and the original document/call quality questions.
 
 ### Maintaining the rooms over time
 
@@ -248,7 +253,8 @@ DROP SCHEMA <catalog>.genie_availity_ops CASCADE;
 │   ├── 05_extended_views.sql       # Extended views: PA decisions, payer mix, call ops + 3 new metric views
 │   ├── 06_uc_constraints.sql       # UC primary/foreign keys for Joins tab auto-population
 │   ├── 07_uc_labels.sql            # Column synonyms (FCR, AHT, ASA, payer, urgency)
-│   └── 08_apply_row_filter.sql     # ALTER TABLE ... SET ROW FILTER — wires the multi-payer claim
+│   ├── 08_apply_row_filter.sql     # ALTER TABLE ... SET ROW FILTER — wires the multi-payer claim
+│   └── 09_spread_timestamps.sql    # Spreads single-batch timestamps over 90 days so trend questions return data
 └── genie_config/
     ├── create_rooms.py             # Idempotent Genie Room provisioning (preserves curation)
     ├── export_rooms.py             # Pull live curation back to JSON (run after UI edits)
