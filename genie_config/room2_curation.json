@@ -124,7 +124,7 @@
     "instructions": {
       "text_instructions": [
         {
-          "id": "31e5b7d9fc1f4d20b20fd88bd2cac176",
+          "id": "9f28151fe7c24737bcebc0d401d8a9bf",
           "content": [
             "## Who uses this room\n",
             "Call center supervisors, QA analysts, provider relations leads, and operations managers at a national HIN's provider support floor. Provider calls come into multiple outsourced agencies for prior authorizations, claims status, eligibility, benefit inquiries, or enrollment.\n",
@@ -150,8 +150,11 @@
             "- Compliance defaults: last 30 days. FCR / AHT / ASA defaults: last 14 days.\n",
             "- 'Declining' sentiment trajectory with a normal score band is an early warning \u2014 flag it.\n",
             "\n",
-            "## Beyond this room\n",
-            "Document processing, OCR quality, match outcomes, PA decisions / SLAs, payer mix: 'Clinical Document Processing Intelligence' room.\n"
+            "## SCOPE BOUNDARY \u2014 REFUSE OUT-OF-SCOPE QUESTIONS\n",
+            "- This room contains ONLY call-center data: call scores, sentiment, compliance, and call operations (FCR / AHT / ASA).\n",
+            "- It does NOT contain: clinical documents, OCR results, member/auth match outcomes, prior-authorization decisions, payer mix, or pipeline KPIs.\n",
+            "- If a user asks about documents, intake, OCR, match rates, risk tiers, PA decisions, PA SLAs, payer mix, or any pipeline metric \u2014 REFUSE. Do NOT attempt to interpret call_id, agent_name, or call_type as document fields. Respond: 'That question belongs in the Clinical Document Processing Intelligence room \u2014 this room covers call-center quality and operations only.'\n",
+            "- The `call_id` column is a CALL identifier, not a clinical document. There is no count-of-documents that can be computed from this room.\n"
           ]
         }
       ],
@@ -162,7 +165,7 @@
             "High risk calls with declining sentiment"
           ],
           "sql": [
-            "SELECT c.call_id, c.agent_name, c.call_score, c.disposition, s.sentiment_overall, s.sentiment_trajectory, s.summary_text FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores c JOIN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment s ON c.call_id = s.document_id WHERE c.outcome_bucket = 'high_risk' AND s.sentiment_trajectory = 'declining' ORDER BY c.call_score"
+            "SELECT c.call_id, c.agent_name, c.call_score, c.disposition, s.sentiment_overall, s.sentiment_trajectory, s.summary_text FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores c JOIN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment s ON c.call_id = s.call_id WHERE c.outcome_bucket = 'high_risk' AND s.sentiment_trajectory = 'declining' ORDER BY c.call_score"
           ],
           "usage_guidance": [
             "Use for identifying worst-case calls combining low scores with declining sentiment"
@@ -234,7 +237,7 @@
             "Sentiment distribution for escalated calls"
           ],
           "sql": [
-            "SELECT s.sentiment_overall, s.sentiment_trajectory, COUNT(*) AS call_count FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment s JOIN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores c ON s.document_id = c.call_id WHERE c.disposition = 'escalated' GROUP BY s.sentiment_overall, s.sentiment_trajectory ORDER BY call_count DESC"
+            "SELECT s.sentiment_overall, s.sentiment_trajectory, COUNT(*) AS call_count FROM serverless_stable_swv01_catalog.genie_availity_ops.genie_call_sentiment s JOIN serverless_stable_swv01_catalog.genie_availity_ops.genie_call_scores c ON s.call_id = c.call_id WHERE c.disposition = 'escalated' GROUP BY s.sentiment_overall, s.sentiment_trajectory ORDER BY call_count DESC"
           ],
           "usage_guidance": [
             "Use for sentiment analysis on escalated or problematic calls"

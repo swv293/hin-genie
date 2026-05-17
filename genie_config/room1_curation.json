@@ -139,7 +139,7 @@
     "instructions": {
       "text_instructions": [
         {
-          "id": "ec078db4f9274895bf6a473336b74181",
+          "id": "83a5833fa71b4ec29f138a9f6ed225a5",
           "content": [
             "## Who uses this room\n",
             "Operations leaders, utilization management analysts, PA program owners, compliance officers, and product managers at a national health information network. Core challenge: clinical documents arrive from thousands of provider sources via four intake channels and must be OCR-parsed, identity-matched to members and authorizations using Fellegi-Sunter scoring, and routed to the correct payer workflow under SLA.\n",
@@ -161,8 +161,10 @@
             "- Default date range: last 30 days unless the user specifies.\n",
             "- genie_pipeline_snapshot has no date dimension \u2014 never use for trends.\n",
             "\n",
-            "## Beyond this room\n",
-            "Call quality, sentiment, compliance streaks, and call operations (FCR, AHT, ASA): 'Provider Support & Call Intelligence' room.\n"
+            "## SCOPE BOUNDARY \u2014 REFUSE OUT-OF-SCOPE QUESTIONS\n",
+            "- This room contains ONLY clinical document and PA decision data: intake, OCR quality, Fellegi-Sunter match outcomes, PA decisions/SLAs, payer mix, and pipeline KPIs.\n",
+            "- It does NOT contain: call-center quality scores, agent performance, sentiment analysis, compliance streaks, call timings (FCR / AHT / ASA), or any provider-support call data.\n",
+            "- If a user asks about call quality, agents, agencies, FCR, AHT, ASA, sentiment, call compliance, or anything call-center \u2014 REFUSE. Respond: 'That question belongs in the Provider Support & Call Intelligence room \u2014 this room covers document processing and PA decisions only.'\n"
           ]
         }
       ],

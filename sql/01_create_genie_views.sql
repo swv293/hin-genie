@@ -329,7 +329,7 @@ FROM serverless_stable_swv01_catalog.transcript_intel_sdp.mv_call_scores;
 --    AI-generated call summaries with sentiment analysis.
 -- ------------------------------------------------------------
 CREATE OR REPLACE VIEW genie_availity_ops.genie_call_sentiment (
-  document_id           COMMENT 'Call identifier -- joins to genie_call_scores on call_id',
+  call_id               COMMENT 'Call identifier -- joins to genie_call_scores on call_id. Note: this is a CALL identifier, not a clinical-document ID.',
   call_type             COMMENT 'Call type taxonomy value',
   summary_text          COMMENT 'AI-generated 2-3 sentence summary of the call',
   sentiment_overall     COMMENT 'Overall: positive, neutral, negative, mixed',
@@ -341,7 +341,7 @@ CREATE OR REPLACE VIEW genie_availity_ops.genie_call_sentiment (
 ) COMMENT 'AI-generated call summaries with sentiment. No PHI/PII.'
 AS
 SELECT
-  document_id, call_type, summary_text,
+  document_id AS call_id, call_type, summary_text,
   sentiment_overall, sentiment_start, sentiment_end, sentiment_trajectory,
   key_topics, emotional_markers
 FROM serverless_stable_swv01_catalog.transcript_intel_sdp.gold_call_summaries_sentiment;
